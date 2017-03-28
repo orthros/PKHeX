@@ -1,10 +1,10 @@
 ﻿using System;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class CK3 : PKM // 3rd Generation PKM File
     {
-        internal static readonly byte[] ExtraBytes =
+        public static readonly byte[] ExtraBytes =
         {
             0x11, 0x12, 0x13,
             0x61, 0x62, 0x63, 0x64,
@@ -32,11 +32,11 @@ namespace PKHeX
         public override int Nature { get { return (int)(PID % 25); } set { } }
         public override int AltForm { get { return Species == 201 ? PKX.getUnownForm(PID) : 0; } set { } }
 
-        public override bool IsNicknamed { get { return PKX.getIsNicknamed(Species, Nickname); } set { } }
+        public override bool IsNicknamed { get { return PKX.getIsNicknamedAnyLanguage(Species, Nickname, Format); } set { } }
         public override int Gender { get { return PKX.getGender(Species, PID); } set { } }
         public override int Characteristic => -1;
         public override int CurrentFriendship { get { return OT_Friendship; } set { OT_Friendship = value; } }
-        public override int Ability { get { int[] abils = PersonalTable.RS.getAbilities(Species, 0); return abils[abils[1] == 0 ? 0 : AbilityNumber]; } set { } }
+        public override int Ability { get { int[] abils = PersonalTable.RS.getAbilities(Species, 0); return abils[abils[1] == 0 ? 0 : AbilityNumber >> 1]; } set { } }
         public override int CurrentHandler { get { return 0; } set { } }
         public override int Egg_Location { get { return 0; } set { } }
 
@@ -50,7 +50,7 @@ namespace PKHeX
         public override int Version { get { return SaveUtil.getG3VersionID(Data[0x08]); } set { Data[0x08] = (byte)SaveUtil.getCXDVersionID(value); } }
         public int CurrentRegion { get { return Data[0x09]; } set { Data[0x09] = (byte)value; } }
         public int OriginalRegion { get { return Data[0x0A]; } set { Data[0x0A] = (byte)value; } }
-        public override int Language { get { return Data[0x0B]; } set { Data[0x0B] = (byte)value; } }
+        public override int Language { get { return PKX.getMainLangIDfromGC(Data[0x0B]); } set { Data[0x0B] = PKX.getGCLangIDfromMain((byte)value); } }
         public override int Met_Location { get { return BigEndian.ToUInt16(Data, 0x0C); } set { BigEndian.GetBytes((ushort)value).CopyTo(Data, 0x0C);} }
         public override int Met_Level { get { return Data[0x0E]; } set { Data[0x0E] = (byte)value; } }
         public override int Ball { get { return Data[0x0F]; } set { Data[0x0F] = (byte)value; } }
@@ -167,7 +167,7 @@ namespace PKHeX
 
         public override int PKRS_Strain { get { return Data[0xCA] & 0xF; } set { Data[0xCA] = (byte)(value & 0xF); } }
         public override bool IsEgg { get { return Data[0xCB] == 1; } set { Data[0xCB] = (byte)(value ? 1 : 0); } }
-        public override int AbilityNumber { get { return Data[0xCC]; } set { Data[0xCC] = (byte)(value & 1); } }
+        public override int AbilityNumber { get { return 1 << Data[0xCC]; } set { Data[0xCC] = (byte)((value >> 1) & 1); } }
         public override bool Valid { get { return Data[0xCD] == 0; } set { if (value) Data[0xCD] = 0; } }
         // 0xCE unknown
         public override int MarkValue { get { return Data[0xCF]; } protected set { Data[0xCF] = (byte)value; } }
@@ -186,23 +186,6 @@ namespace PKHeX
         public override byte[] Encrypt()
         {
             return (byte[])Data.Clone();
-        }
-        public override bool getGenderIsValid()
-        {
-            int gv = PersonalTable.RS[Species].Gender;
-
-            if (gv == 255)
-                return Gender == 2;
-            if (gv == 254)
-                return Gender == 0;
-            if (gv == 0)
-                return Gender == 1;
-            if (gv <= (PID & 0xFF))
-                return Gender == 0;
-            if ((PID & 0xFF) < gv)
-                return Gender == 1;
-
-            return false;
         }
     }
 }

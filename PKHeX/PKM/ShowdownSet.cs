@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class ShowdownSet
     {
@@ -16,7 +16,7 @@ namespace PKHeX
         private static readonly string[] moves = Util.getMovesList("en");
         private static readonly string[] abilities = Util.getAbilitiesList("en");
         private static readonly string[] hptypes = types.Skip(1).ToArray();
-        private const int MAX_SPECIES = 721;
+        private const int MAX_SPECIES = 802;
 
         // Default Set Data
         public string Nickname { get; set; }
@@ -84,6 +84,8 @@ namespace PKHeX
                 }
 
                 string[] brokenline = line.Split(new[] { ": " }, StringSplitOptions.None);
+                if (brokenline.Length == 1)
+                    brokenline = new[] {brokenline[0], ""};
                 switch (brokenline[0])
                 {
                     case "Trait":
@@ -96,6 +98,7 @@ namespace PKHeX
                     case "EVs": { parseLineEVs(brokenline[1].Trim()); break; }
                     case "IV":
                     case "IVs": { parseLineIVs(brokenline[1].Trim()); break; }
+                    case "Type": { brokenline = new[] {line}; goto default; } // Type: Null edge case
                     default:
                     {
                         // Either Nature or Gender ItemSpecies
@@ -115,7 +118,7 @@ namespace PKHeX
                         {
                             string naturestr = line.Split(' ')[0].Trim();
                             int nature = Array.IndexOf(natures, naturestr);
-                            if (Nature < 0)
+                            if (nature < 0)
                                 InvalidLines.Add($"Unknown Nature: {naturestr}");
                             else
                                 Nature = nature;
@@ -136,16 +139,63 @@ namespace PKHeX
 
             IVs = IVsSpeedFirst;
             EVs = EVsSpeedFirst;
+
+            // Showdown Quirks
+            switch (Species)
+            {
+                case 658: // Greninja
+                    if (Ability == 210) Form = "Ash"; // Battle Bond
+                    break;
+                case 666: // Vivillon
+                    if (Form == "Pokeball") Form = "Poké Ball";
+                    break;
+                case 718: // Zygarde
+                    if (string.IsNullOrEmpty(Form)) Form = "50%";
+                    else if (Form == "Complete") Form = "100%";
+                    if (Ability == 211) Form += "-C"; // Power Construct
+                    break;
+                case 774: // Minior
+                    if (!string.IsNullOrWhiteSpace(Form) && Form != "Meteor")
+                        Form = "C-" + Form;
+                    break;
+            }
         }
         public string getText()
         {
             if (Species == 0 || Species > MAX_SPECIES)
                 return "";
 
+            // Showdown Quirks
+            string form = Form;
+            if (!string.IsNullOrWhiteSpace(form))
+            {
+                switch (Species)
+                {
+                    case 658: // Greninja
+                        form = form.Replace("Ash", "");
+                        form = form.Replace("Active", "");
+                        break;
+                    case 718: // Zygarde
+                        form = form.Replace("-C", "");
+                        form = form.Replace("50%", "");
+                        form = form.Replace("100%", "Complete");
+                        break;
+                    case 774: // Minior
+                        if (form.StartsWith("M-"))
+                            form = "Meteor";
+                        form = form.Replace("C-", "");
+                        break;
+                }
+            }
+            else if (Species == 774) // Minior
+            {
+                form = "Meteor";
+            }
+
             // First Line: Name, Nickname, Gender, Item
             string specForm = species[Species];
-            if (!string.IsNullOrWhiteSpace(Form))
-                specForm += "-" + Form.Replace("Mega ", "Mega-");
+            if (!string.IsNullOrWhiteSpace(form))
+                specForm += "-" + form.Replace("Mega ", "Mega-");
 
             string result = Nickname != null && species[Species] != Nickname ? $"{Nickname} ({specForm})" : $"{specForm}"; 
             if (!string.IsNullOrEmpty(Gender))
@@ -207,11 +257,11 @@ namespace PKHeX
 
             return result;
         }
-        internal static string getShowdownText(PKM pkm)
+        public static string getShowdownText(PKM pkm)
         {
             if (pkm.Species == 0) return "";
 
-            string[] Forms = PKX.getFormList(pkm.Species, types, forms, new[] {"", "F", ""});
+            string[] Forms = PKX.getFormList(pkm.Species, types, forms, new[] {"", "F", ""}, pkm.Format);
             ShowdownSet Set = new ShowdownSet
             {
                 Nickname = pkm.Nickname,
@@ -228,7 +278,11 @@ namespace PKHeX
                 Shiny = pkm.IsShiny,
                 Form = pkm.AltForm > 0 && pkm.AltForm < Forms.Length ? Forms[pkm.AltForm] : "",
             };
+
             if (Set.Form == "F") Set.Gender = "";
+            else if (Set.Species == 676) Set.Form = ""; // Furfrou
+            else if (Set.Species == 666 && Set.Form == "Poké Ball") Set.Form = "Pokeball"; // Vivillon
+
             return Set.getText();
         }
 
@@ -264,7 +318,7 @@ namespace PKHeX
         {
             int index = line.LastIndexOf("(", StringComparison.Ordinal);
             string n1, n2;
-            if (index != 0) // correct format
+            if (index > 1) // correct format
             {
                 n1 = line.Substring(0, index - 1);
                 n2 = line.Substring(index).Trim();
@@ -304,6 +358,8 @@ namespace PKHeX
         private void parseLineEVs(string line)
         {
             string[] evlist = splitLineStats(line);
+            if (evlist.Length == 1)
+                InvalidLines.Add("Unknown EV input.");
             for (int i = 0; i < evlist.Length / 2; i++)
             {
                 ushort EV;
@@ -318,6 +374,8 @@ namespace PKHeX
         private void parseLineIVs(string line)
         {
             string[] ivlist = splitLineStats(line);
+            if (ivlist.Length == 1)
+                InvalidLines.Add("Unknown IV input.");
             for (int i = 0; i < ivlist.Length / 2; i++)
             {
                 byte IV;

@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public sealed class SAV3RSBox : SaveFile
     {
-        public override string BAKName => $"{FileName} [{Version} #{SaveCount.ToString("0000")}].bak";
+        public override string BAKName => $"{FileName} [{Version} #{SaveCount:0000}].bak";
         public override string Filter => "GameCube Save File|*.gci|All Files|*.*";
         public override string Extension => ".gci";
 
@@ -22,7 +22,7 @@ namespace PKHeX
             for (int i = 0; i < Blocks.Length; i++)
             {
                 int offset = BLOCK_SIZE + i* BLOCK_SIZE;
-                Blocks[i] = new RSBOX_Block(Data.Skip(offset).Take(BLOCK_SIZE).ToArray(), offset);
+                Blocks[i] = new RSBOX_Block(getData(offset, BLOCK_SIZE), offset);
             }
 
             // Detect active save
@@ -62,12 +62,17 @@ namespace PKHeX
             // Set Data Back
             foreach (RSBOX_Block b in Blocks)
                 b.Data.CopyTo(Data, b.Offset);
-            byte[] newFile = Data.Take(Data.Length - SIZE_RESERVED).ToArray();
+            byte[] newFile = getData(0, Data.Length - SIZE_RESERVED);
             return Header.Concat(newFile).ToArray();
         }
 
         // Configuration
-        public override SaveFile Clone() { return new SAV3(Write(DSV: false), Version); }
+        public override SaveFile Clone()
+        {
+            byte[] data = Write(DSV: false).Skip(Header.Length).ToArray();
+            var sav = new SAV3RSBox(data) {Header = (byte[]) Header.Clone()};
+            return sav;
+        }
 
         public override int SIZE_STORED => PKX.SIZE_3STORED + 4;
         public override int SIZE_PARTY => PKX.SIZE_3PARTY; // unused
@@ -87,6 +92,7 @@ namespace PKHeX
         public override int OTLength => 8;
         public override int NickLength => 10;
         public override int MaxMoney => 999999;
+        public override bool HasBoxWallpapers => false;
 
         public override int BoxCount => 50;
         public override bool HasParty => false;
@@ -106,7 +112,7 @@ namespace PKHeX
             get
             {
                 return string.Join(Environment.NewLine, 
-                    Blocks.Where(b => !b.ChecksumsValid).Select(b => $"Block {b.BlockNumber.ToString("00")} invalid"));
+                    Blocks.Where(b => !b.ChecksumsValid).Select(b => $"Block {b.BlockNumber:00} invalid"));
             }
         }
 
@@ -136,15 +142,15 @@ namespace PKHeX
         public override string getBoxName(int box)
         {
             // Tweaked for the 1-30/31-60 box showing
-            string lo = (30*(box%2) + 1).ToString("00");
-            string hi = (30*(box%2 + 1)).ToString("00");
-            string boxName = $"[{lo}-{hi}] ";
-            box = box / 2;
+            int lo = 30*(box%2) + 1;
+            int hi = 30*(box%2 + 1);
+            string boxName = $"[{lo:00}-{hi:00}] ";
+            box /= 2;
 
             int offset = Box + 0x1EC38 + 9 * box;
             if (Data[offset] == 0 || Data[offset] == 0xFF)
                 boxName += $"BOX {box + 1}";
-            boxName += PKX.getG3Str(Data.Skip(offset).Take(9).ToArray(), Japanese);
+            boxName += PKX.getG3Str(getData(offset, 9), Japanese);
 
             return boxName;
         }
@@ -153,8 +159,9 @@ namespace PKHeX
             int offset = Box + 0x1EC38 + 9 * box;
             if (value.Length > 8)
                 value = value.Substring(0, 8); // Hard cap
-            if (value == "BOX " + (box + 1))
-                new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }.CopyTo(Data, offset);
+
+            byte[] data = value == $"BOX {box + 1}" ? new byte[9] : PKX.setG3Str(value, Japanese); 
+            setData(data, offset);
         }
         public override PKM getPKM(byte[] data)
         {

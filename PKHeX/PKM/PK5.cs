@@ -2,11 +2,11 @@
 using System.Linq;
 using System.Text;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class PK5 : PKM // 5th Generation PKM File
     {
-        internal static readonly byte[] ExtraBytes =
+        public static readonly byte[] ExtraBytes =
         {
             0x42, 0x43, 0x5E, 0x63, 0x64, 0x65, 0x66, 0x67, 0x87
         };
@@ -29,6 +29,7 @@ namespace PKHeX
         public override uint EncryptionConstant { get { return PID; } set { } }
         public override int CurrentFriendship { get { return OT_Friendship; } set { OT_Friendship = value; } }
         public override int CurrentHandler { get { return 0; } set { } }
+        public override int AbilityNumber { get { return HiddenAbility ? 4 : 1 << PIDAbility; } set { } }
 
         // Structure
         public override uint PID { get { return BitConverter.ToUInt32(Data, 0x00); } set { BitConverter.GetBytes(value).CopyTo(Data, 0x00); } }
@@ -250,12 +251,12 @@ namespace PKHeX
                 Encoding.Unicode.GetBytes(TempNick).CopyTo(Data, 0x68);
             }
         }
-        protected override int Egg_Year { get { return Data[0x78]; } set { Data[0x78] = (byte)value; } }
-        protected override int Egg_Month { get { return Data[0x79]; } set { Data[0x79] = (byte)value; } }
-        protected override int Egg_Day { get { return Data[0x7A]; } set { Data[0x7A] = (byte)value; } }
-        protected override int Met_Year { get { return Data[0x7B]; } set { Data[0x7B] = (byte)value; } }
-        protected override int Met_Month { get { return Data[0x7C]; } set { Data[0x7C] = (byte)value; } }
-        protected override int Met_Day { get { return Data[0x7D]; } set { Data[0x7D] = (byte)value; } }
+        public override int Egg_Year { get { return Data[0x78]; } set { Data[0x78] = (byte)value; } }
+        public override int Egg_Month { get { return Data[0x79]; } set { Data[0x79] = (byte)value; } }
+        public override int Egg_Day { get { return Data[0x7A]; } set { Data[0x7A] = (byte)value; } }
+        public override int Met_Year { get { return Data[0x7B]; } set { Data[0x7B] = (byte)value; } }
+        public override int Met_Month { get { return Data[0x7C]; } set { Data[0x7C] = (byte)value; } }
+        public override int Met_Day { get { return Data[0x7D]; } set { Data[0x7D] = (byte)value; } }
         public override int Egg_Location { get { return BitConverter.ToUInt16(Data, 0x7E); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0x7E); } }
         public override int Met_Location { get { return BitConverter.ToUInt16(Data, 0x80); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0x80); } }
         private byte PKRS { get { return Data[0x82]; } set { Data[0x82] = value; } }
@@ -298,25 +299,11 @@ namespace PKHeX
                 return pm6stat * 5 + maxIV % 5;
             }
         }
-        
+
+        // Legality Extensions
+        public override bool WasEgg => GenNumber < 4 ? base.WasEgg : GenNumber == 4 ? Egg_Location > 0 : Legal.EggLocations.Contains(Egg_Location);
+
         // Methods
-        public override bool getGenderIsValid()
-        {
-            int gv = PersonalInfo.Gender;
-
-            if (gv == 255)
-                return Gender == 2;
-            if (gv == 254)
-                return Gender == 1;
-            if (gv == 0)
-                return Gender == 0;
-            if ((PID & 0xFF) <= gv)
-                return Gender == 1;
-            if (gv < (PID & 0xFF))
-                return Gender == 0;
-
-            return false;
-        }
         public override byte[] Encrypt()
         {
             RefreshChecksum();
@@ -338,6 +325,8 @@ namespace PKHeX
 
             int[] abilities = PersonalInfo.Abilities;
             int abilval = Array.IndexOf(abilities, Ability);
+            if (abilval >= 0 && abilities[abilval] == abilities[2] && HiddenAbility)
+                abilval = 2; // hidden ability shared with a regular ability
             if (abilval >= 0)
                 pk6.AbilityNumber = 1 << abilval;
             else // Fallback (shouldn't happen)
@@ -345,12 +334,7 @@ namespace PKHeX
                 if (HiddenAbility) pk6.AbilityNumber = 4; // Hidden, else G5 or G3/4 correlation.
                 else pk6.AbilityNumber = Gen5 ? 1 << (int)(PID >> 16 & 1) : 1 << (int)(PID & 1);
             }
-            pk6.MarkCircle = MarkCircle;
-            pk6.MarkSquare = MarkSquare;
-            pk6.MarkTriangle = MarkTriangle;
-            pk6.MarkHeart = MarkHeart;
-            pk6.MarkStar = MarkStar;
-            pk6.MarkDiamond = MarkDiamond;
+            pk6.Markings = Markings;
             pk6.Language = Language;
 
             pk6.CNT_Cool = CNT_Cool;
@@ -397,6 +381,8 @@ namespace PKHeX
             pk6.AltForm = AltForm;
             pk6.Nature = Nature;
 
+            // Apply trash bytes for species name of current app language -- default to PKM's language
+            pk6.Nickname = PKX.getSpeciesName(Species, Language);
             pk6.Nickname = Nickname.Length > 1 && !IsNicknamed
                 ? Nickname[0] + Nickname.Substring(1).ToLower() // Decapitalize
                 : Nickname;

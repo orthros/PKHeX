@@ -4,42 +4,53 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
-    public static partial class ReflectUtil
+    public static class ReflectUtil
     {
-        internal static bool GetValueEquals(object obj, string propertyName, object value)
+        public static bool GetValueEquals(object obj, string propertyName, object value)
         {
             PropertyInfo pi = obj.GetType().GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
             var v = pi.GetValue(obj, null);
             var c = ConvertValue(value, pi.PropertyType);
             return v.Equals(c);
         }
-        internal static void SetValue(object obj, string propertyName, object value)
+        public static void SetValue(object obj, string propertyName, object value)
         {
             PropertyInfo pi = obj.GetType().GetProperty(propertyName);
             pi.SetValue(obj, ConvertValue(value, pi.PropertyType), null);            
         }
-        internal static object GetValue(object obj, string propertyName)
+
+        public static object GetValue(object obj, string propertyName)
         {
             PropertyInfo pi = obj.GetType().GetProperty(propertyName);
             return pi.GetValue(obj, null);
         }
-        internal static IEnumerable<string> getPropertiesStartWithPrefix(Type type, string prefix)
+
+        public static object GetValue(Type t, string propertyName) => t.GetProperty(propertyName).GetValue(null);
+        public static void SetValue(Type t, string propertyName, object value) => t.GetProperty(propertyName).SetValue(null, value);
+
+        public static IEnumerable<string> getPropertiesStartWithPrefix(Type type, string prefix, BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public)
         {
-            return type.GetProperties()
-                .Where(p => p.Name.StartsWith(prefix))
+            return type.GetProperties(flags)
+                .Where(p => p.Name.StartsWith(prefix, StringComparison.Ordinal))
                 .Select(p => p.Name);
         }
-        internal static IEnumerable<string> getPropertiesCanWritePublic(Type type)
+        public static IEnumerable<string> getPropertiesCanWritePublic(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public)
         {
-            return type.GetProperties().Where(p => p.CanWrite && p.GetSetMethod(nonPublic: true).IsPublic).Select(p => p.Name);
+            return type.GetProperties(flags)
+                .Where(p => p.CanWrite && p.GetSetMethod(nonPublic: true).IsPublic)
+                .Select(p => p.Name);
         }
-        internal static bool HasProperty(this Type type, string name)
+        public static IEnumerable<string> getPropertiesCanWritePublicDeclared(Type type)
+        {
+            return getPropertiesCanWritePublic(type, BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        }
+        public static bool HasProperty(this Type type, string name)
         {
             return type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance) != null;
         }
-        internal static bool HasPropertyAll(this Type type, string name)
+        public static bool HasPropertyAll(this Type type, string name)
         {
             return type.GetProperty(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance) != null;
         }
@@ -57,7 +68,7 @@ namespace PKHeX
             // Convert.ChangeType is suitable for most things
             return Convert.ChangeType(value, type);
         }
-        internal static bool? getBooleanState(object obj, string prop)
+        public static bool? getBooleanState(object obj, string prop)
         {
             return obj.GetType().HasProperty(prop) ? GetValue(obj, prop) as bool? : null;
         }

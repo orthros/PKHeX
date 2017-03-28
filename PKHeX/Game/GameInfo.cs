@@ -2,35 +2,33 @@
 using System.Linq;
 using System.Collections.Generic;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public static class GameInfo
     {
-        private static readonly string[] ptransp = { "ポケシフター", "Poké Transfer", "Poké Fret", "Pokétrasporto", "Poképorter", "Pokétransfer", "포케시프터", "ポケシフター" };
+        private static readonly string[] ptransp = { "ポケシフター", "Poké Transfer", "Poké Fret", "Pokétrasporto", "Poképorter", "Pokétransfer", "포케시프터", "宝可传送", "寶可傳送", "ポケシフター" };
         public static readonly string[] lang_val = { "ja", "en", "fr", "it", "de", "es", "ko", "zh", "zh2", "pt" };
         private const string DefaultLanguage = "en";
         private static readonly GameStrings[] Languages = new GameStrings[lang_val.Length];
 
         // Lazy fetch implementation
-        public static GameStrings getStrings(string lang)
+        private static int DefaultLanguageIndex => Array.IndexOf(lang_val, DefaultLanguage);
+        private static int getLanguageIndex(string lang)
         {
             int l = Array.IndexOf(lang_val, lang);
-            if (l < 0)
-                l = 1;
-            return getIndex(l);
+            return l < 0 ? DefaultLanguageIndex : l;
         }
-        private static GameStrings getIndex(int index)
+        public static GameStrings getStrings(string lang)
         {
+            int index = getLanguageIndex(lang);
             return Languages[index] ?? (Languages[index] = new GameStrings(lang_val[index]));
         }
-
-        private static string getTransporterName(string Language)
+        private static string getTransporterName(string lang)
         {
-            int lang = Array.IndexOf(lang_val, Language);
-            if (lang < 0 || lang >= ptransp.Length)
-                lang = Array.IndexOf(lang_val, DefaultLanguage);
-            
-            return  ptransp[lang < 0 ? 1 : lang];
+            int index = getLanguageIndex(lang);
+            if (index >= ptransp.Length)
+                index = DefaultLanguageIndex;
+            return ptransp[index];
         }
 
         // String providing
@@ -85,14 +83,19 @@ namespace PKHeX
                 var metSanitize = (string[])metCXD_00000.Clone();
                 for (int i = 0; i < metSanitize.Length; i++)
                     if (metCXD_00000.Count(r => r == metSanitize[i]) > 1)
-                        metSanitize[i] += $" [{i.ToString("000")}]";
+                        metSanitize[i] += $" [{i:000}]";
                 metCXD_00000 = metSanitize;
 
                 // Current Generation strings
                 natures = Util.getNaturesList(l);
                 types = get("types");
                 abilitylist = get("abilities");
+
                 movelist = get("moves");
+                string[] ps = {"P", "S"}; // Distinguish Physical/Special
+                for (int i = 622; i < 658; i++)
+                    movelist[i] += $" ({ps[i%2]})";
+
                 itemlist = get("items");
                 characteristics = get("character");
                 specieslist = get("species");
@@ -161,6 +164,7 @@ namespace PKHeX
                 itemlist[751] += " (2)"; // Meteorite
                 itemlist[771] += " (3)"; // Meteorite
                 itemlist[772] += " (4)"; // Meteorite
+                itemlist[842] += " (SM)"; // Fishing Rod
 
                 // Append Z-Crystal flagging
                 foreach (var i in Legal.Pouch_ZCrystal_SM)
@@ -212,6 +216,9 @@ namespace PKHeX
                 }
                 metSM_00000_good.CopyTo(metSM_00000, 0);
 
+                for (int i = 2; i <= 5; i++) // distinguish first set of regions (unused) from second (used)
+                    metSM_30000[i] += " (-)";
+
                 // Set the first entry of a met location to "" (nothing)
                 // Fix (None) tags
                 abilitylist[0] = itemlist[0] = movelist[0] = metXY_00000[0] = metBW2_00000[0] = metHGSS_00000[0] = "(" + itemlist[0] + ")";
@@ -221,6 +228,12 @@ namespace PKHeX
                 string[] data = Util.getStringList(ident, Language);
                 if (data == null || data.Length == 0)
                     data = Util.getStringList(ident, DefaultLanguage);
+
+                // Use alternate (Fan Translated) species names since GameFreak decided to use non-Unicode characters which are now game-font dependent.
+                // PKX still fetches nickname with the actual string
+                if (ident == "species" && new[] {"zh", "zh2"}.Contains(Language))
+                    return Util.getSpeciesList(Language + "_alt");
+
                 return data;
             }
 
@@ -249,11 +262,13 @@ namespace PKHeX
                 }
             }
         }
+        public static GameStrings Strings;
 
         // DataSource providing
-        public static List<ComboItem> MoveDataSource, ItemDataSource, SpeciesDataSource, BallDataSource, NatureDataSource, AbilityDataSource, VersionDataSource;
-        public static List<ComboItem> HaXMoveDataSource;
+        public static List<ComboItem> ItemDataSource, SpeciesDataSource, BallDataSource, NatureDataSource, AbilityDataSource, VersionDataSource;
+        public static List<ComboItem> LegalMoveDataSource, HaXMoveDataSource, MoveDataSource;
         private static List<ComboItem> metGen2, metGen3, metGen3CXD, metGen4, metGen5, metGen6, metGen7;
+
         public static void InitializeDataSources(GameStrings s)
         {
             int[] ball_nums = { 007, 576, 013, 492, 497, 014, 495, 493, 496, 494, 011, 498, 008, 006, 012, 015, 009, 005, 499, 010, 001, 016, 851 };
@@ -263,9 +278,11 @@ namespace PKHeX
             NatureDataSource = Util.getCBList(s.natures, null);
             AbilityDataSource = Util.getCBList(s.abilitylist, null);
             VersionDataSource = Util.getCBList(s.gamelist, Legal.Games_7sm, Legal.Games_6oras, Legal.Games_6xy, Legal.Games_5, Legal.Games_4, Legal.Games_4e, Legal.Games_4r, Legal.Games_3, Legal.Games_3e, Legal.Games_3r, Legal.Games_3s);
+            VersionDataSource.AddRange(Util.getCBList(s.gamelist, Legal.Games_7vc1).OrderBy(g => g.Value)); // stuff to end unsorted
+            VersionDataSource.AddRange(Util.getCBList(s.gamelist, Legal.Games_7go).OrderBy(g => g.Value)); // stuff to end unsorted
 
             HaXMoveDataSource = Util.getCBList(s.movelist, null);
-            MoveDataSource = HaXMoveDataSource.Where(m => !Legal.Z_Moves.Contains(m.Value)).ToList();
+            MoveDataSource = LegalMoveDataSource = HaXMoveDataSource.Where(m => !Legal.Z_Moves.Contains(m.Value)).ToList();
             #region Met Locations
             // Gen 2
             {
@@ -332,7 +349,7 @@ namespace PKHeX
         public static void setItemDataSource(bool HaX, int MaxItemID, IEnumerable<ushort> allowed, int generation, GameVersion game, GameStrings s)
         {
             string[] items = s.getItemStrings(generation, game);
-            ItemDataSource = Util.getCBList(items, (HaX ? Enumerable.Range(0, MaxItemID) : allowed.Select(i => (int) i)).ToArray());
+            ItemDataSource = Util.getCBList(items, (allowed == null || HaX ? Enumerable.Range(0, MaxItemID) : allowed.Select(i => (int) i)).ToArray());
         }
         public static List<ComboItem> getLocationList(GameVersion Version, int SaveFormat, bool egg)
         {
@@ -402,6 +419,12 @@ namespace PKHeX
 
                 case GameVersion.SN:
                 case GameVersion.MN:
+
+                case GameVersion.GO:
+                case GameVersion.RD:
+                case GameVersion.BU:
+                case GameVersion.GN:
+                case GameVersion.YW:
                     return metGen7.Take(3).Concat(metGen7.Skip(3).OrderByDescending(loc => loc.Value < 200)).ToList(); // Secret Base
             }
 
@@ -417,6 +440,139 @@ namespace PKHeX
                     .Concat(metGen5.Skip(3).Where(loc => loc.Value != 30001)).ToList();
 
             return metGen6;
+        }
+
+        /// <summary>
+        /// Gets Country and Region strings for corresponding IDs and language.
+        /// </summary>
+        /// <param name="country">Country ID</param>
+        /// <param name="region">Region ID</param>
+        /// <param name="language">Language ID</param>
+        /// <returns></returns>
+        public static Tuple<string, string> getCountryRegionText(int country, int region, string language)
+        {
+            // Get Language we're fetching for
+            int lang = Array.IndexOf(new[] { "ja", "en", "fr", "de", "it", "es", "zh", "ko" }, language);
+            string c = getCountryString(country, lang);
+            string r = getRegionString(country, region, lang);
+            return new Tuple<string, string>(c, r); // country, region
+        }
+
+        /// <summary>
+        /// Gets the Country string for a given Country ID
+        /// </summary>
+        /// <param name="country">Country ID</param>
+        /// <param name="language">Language ID</param>
+        /// <returns>Country ID string</returns>
+        private static string getCountryString(int country, int language)
+        {
+            string c;
+            // Get Country Text
+            try
+            {
+                string[] inputCSV = Util.getStringList("countries");
+                // Set up our Temporary Storage
+                string[] unsortedList = new string[inputCSV.Length - 1];
+                int[] indexes = new int[inputCSV.Length - 1];
+
+                // Gather our data from the input file
+                for (int i = 1; i < inputCSV.Length; i++)
+                {
+                    string[] countryData = inputCSV[i].Split(',');
+                    if (countryData.Length <= 1) continue;
+                    indexes[i - 1] = Convert.ToInt32(countryData[0]);
+                    unsortedList[i - 1] = countryData[language + 1];
+                }
+
+                int countrynum = Array.IndexOf(indexes, country);
+                c = unsortedList[countrynum];
+            }
+            catch { c = "Illegal"; }
+
+            return c;
+        }
+
+        /// <summary>
+        /// Gets the Region string for a specified country ID.
+        /// </summary>
+        /// <param name="country">Country ID</param>
+        /// <param name="region">Region ID</param>
+        /// <param name="language">Language ID</param>
+        /// <returns>Region ID string</returns>
+        private static string getRegionString(int country, int region, int language)
+        {
+            // Get Region Text
+            try
+            {
+                string[] inputCSV = Util.getStringList("sr_" + country.ToString("000"));
+                // Set up our Temporary Storage
+                string[] unsortedList = new string[inputCSV.Length - 1];
+                int[] indexes = new int[inputCSV.Length - 1];
+
+                // Gather our data from the input file
+                for (int i = 1; i < inputCSV.Length; i++)
+                {
+                    string[] countryData = inputCSV[i].Split(',');
+                    if (countryData.Length <= 1) continue;
+                    indexes[i - 1] = Convert.ToInt32(countryData[0]);
+                    unsortedList[i - 1] = countryData[language + 1];
+                }
+
+                int regionnum = Array.IndexOf(indexes, region);
+                return unsortedList[regionnum];
+            }
+            catch { return "Illegal"; }
+        }
+
+        /// <summary>
+        /// Gets the location names array for a specified generation.
+        /// </summary>
+        /// <param name="gen">Generation to get location names for.</param>
+        /// <param name="bankID">BankID used to choose the text bank.</param>
+        /// <returns>List of location names.</returns>
+        public static string[] getLocationNames(int gen, int bankID)
+        {
+            switch (gen)
+            {
+                case 2: return Strings.metGSC_00000;
+                case 3: return Strings.metRSEFRLG_00000;
+                case 4:
+                    switch (bankID)
+                    {
+                        case 0: return Strings.metHGSS_00000;
+                        case 2: return Strings.metHGSS_02000;
+                        default: return null;
+                    }
+                case 5:
+                    switch (bankID)
+                    {
+                        case 0: return Strings.metBW2_00000;
+                        case 3: return Strings.metBW2_30000;
+                        case 4: return Strings.metBW2_40000;
+                        case 6: return Strings.metBW2_60000;
+                        default: return null;
+                    }
+                case 6:
+                    switch (bankID)
+                    {
+                        case 0: return Strings.metXY_00000;
+                        case 3: return Strings.metXY_30000;
+                        case 4: return Strings.metXY_40000;
+                        case 6: return Strings.metXY_60000;
+                        default: return null;
+                    }
+                case 7:
+                    switch (bankID)
+                    {
+                        case 0: return Strings.metSM_00000;
+                        case 3: return Strings.metSM_30000;
+                        case 4: return Strings.metSM_40000;
+                        case 6: return Strings.metSM_60000;
+                        default: return null;
+                    }
+                default:
+                    return null;
+            }
         }
     }
 }

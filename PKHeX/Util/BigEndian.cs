@@ -1,10 +1,10 @@
 ﻿using System;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
-    internal static class BigEndian
+    public static class BigEndian
     {
-        internal static uint ToUInt32(byte[] data, int offset)
+        public static uint ToUInt32(byte[] data, int offset)
         {
             int val = 0;
             val |= data[offset + 0] << 24;
@@ -13,14 +13,14 @@ namespace PKHeX
             val |= data[offset + 3] << 0;
             return (uint)val;
         }
-        internal static ushort ToUInt16(byte[] data, int offset)
+        public static ushort ToUInt16(byte[] data, int offset)
         {
             int val = 0;
             val |= data[offset + 0] << 8;
             val |= data[offset + 1] << 0;
             return (ushort)val;
         }
-        internal static int ToInt32(byte[] data, int offset)
+        public static int ToInt32(byte[] data, int offset)
         {
             int val = 0;
             val |= data[offset + 0] << 24;
@@ -29,7 +29,7 @@ namespace PKHeX
             val |= data[offset + 3] << 0;
             return val;
         }
-        internal static short ToInt16(byte[] data, int offset)
+        public static short ToInt16(byte[] data, int offset)
         {
             int val = 0;
             val |= data[offset + 0] << 8;
@@ -37,19 +37,19 @@ namespace PKHeX
             return (short)val;
         }
 
-        internal static byte[] GetBytes(int value)
+        public static byte[] GetBytes(int value)
         {
             return Invert(BitConverter.GetBytes(value));
         }
-        internal static byte[] GetBytes(short value)
+        public static byte[] GetBytes(short value)
         {
             return Invert(BitConverter.GetBytes(value));
         }
-        internal static byte[] GetBytes(uint value)
+        public static byte[] GetBytes(uint value)
         {
             return Invert(BitConverter.GetBytes(value));
         }
-        internal static byte[] GetBytes(ushort value)
+        public static byte[] GetBytes(ushort value)
         {
             return Invert(BitConverter.GetBytes(value));
         }
@@ -61,6 +61,41 @@ namespace PKHeX
             int i = data.Length;
             while (o != data.Length)
                 result[--i] = data[o++];
+            return result;
+        }
+
+        /// <summary>
+        /// Returns a 32-bit signed integer converted from bytes in a Binary Coded Decimal format byte array.
+        /// </summary>
+        /// <param name="input">Input byte array to read from.</param>
+        /// <param name="offset">Offset to start reading at.</param>
+        /// <param name="length">Length of array to read.</param>
+        public static int BCDToInt32(byte[] input, int offset, int length)
+        {
+            int result = 0;
+            for (int i = offset; i < offset + length; i++)
+            {
+                byte p = input[i];
+                result *= 100;
+                result += 10 * (p >> 4);
+                result += p & 0xf;
+            }
+            return result;
+        }
+        /// <summary>
+        /// Returns the specified 32-bit signed integer value as an array of Binary Coded Decimal format bytes.
+        /// </summary>
+        /// <param name="input">32-bit signed integer to convert.</param>
+        /// <param name="size">Desired size of returned array.</param>
+        public static byte[] Int32ToBCD(int input, int size)
+        {
+            byte[] result = new byte[size];
+            for (int i = 0; i < size; i++)
+            {
+                int p = input%100;
+                input /= 100;
+                result[size - i - 1] = (byte)(p/10 << 4 | p%10);
+            }
             return result;
         }
     }

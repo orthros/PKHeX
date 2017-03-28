@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Text;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public sealed class SAV6 : SaveFile
     {
@@ -44,12 +44,12 @@ namespace PKHeX
         public override int OTLength => 12;
         public override int NickLength => 12;
 
-        public override int MaxMoveID => XY ? 617 : 621;
+        public override int MaxMoveID => XY ? Legal.MaxMoveID_6_XY : Legal.MaxMoveID_6_AO;
         public override int MaxSpeciesID => Legal.MaxSpeciesID_6;
-        public override int MaxItemID => XY ? 717 : 775;
-        public override int MaxAbilityID => XY ? 188 : 191;
-        public override int MaxBallID => 0x19;
-        public override int MaxGameID => 27; // OR
+        public override int MaxItemID => XY ? Legal.MaxItemID_6_XY : Legal.MaxItemID_6_AO;
+        public override int MaxAbilityID => XY ? Legal.MaxAbilityID_6_XY : Legal.MaxAbilityID_6_AO;
+        public override int MaxBallID => Legal.MaxBallID_6;
+        public override int MaxGameID => Legal.MaxGameID_6; // OR
 
         // Feature Overrides
         public override bool HasGeolocation => true;
@@ -98,6 +98,8 @@ namespace PKHeX
             // Apply checksums
             for (int i = 0; i < Blocks.Length; i++)
             {
+                if (Blocks[i].Length + Blocks[i].Offset > Data.Length)
+                { Console.WriteLine("Block {0} has invalid offset/length value.", i); return; }
                 byte[] array = new byte[Blocks[i].Length];
                 Array.Copy(Data, Blocks[i].Offset, array, 0, array.Length);
                 BitConverter.GetBytes(SaveUtil.ccitt16(array)).CopyTo(Data, BlockInfoOffset + 6 + i * 8);
@@ -109,6 +111,8 @@ namespace PKHeX
             {
                 for (int i = 0; i < Blocks.Length; i++)
                 {
+                    if (Blocks[i].Length + Blocks[i].Offset > Data.Length)
+                        return false;
                     byte[] array = new byte[Blocks[i].Length];
                     Array.Copy(Data, Blocks[i].Offset, array, 0, array.Length);
                     if (SaveUtil.ccitt16(array) != BitConverter.ToUInt16(Data, BlockInfoOffset + 6 + i * 8))
@@ -125,13 +129,15 @@ namespace PKHeX
                 string rv = "";
                 for (int i = 0; i < Blocks.Length; i++)
                 {
+                    if (Blocks[i].Length + Blocks[i].Offset > Data.Length)
+                        return $"Block {i} Invalid Offset/Length.";
                     byte[] array = new byte[Blocks[i].Length];
                     Array.Copy(Data, Blocks[i].Offset, array, 0, array.Length);
                     if (SaveUtil.ccitt16(array) == BitConverter.ToUInt16(Data, BlockInfoOffset + 6 + i * 8))
                         continue;
 
                     invalid++;
-                    rv += $"Invalid: {i.ToString("X2")} @ Region {Blocks[i].Offset.ToString("X5") + Environment.NewLine}";
+                    rv += $"Invalid: {i:X2} @ Region {Blocks[i].Offset:X5}" + Environment.NewLine;
                 }
                 // Return Outputs
                 rv += $"SAV: {Blocks.Length - invalid}/{Blocks.Length + Environment.NewLine}";
@@ -341,15 +347,31 @@ namespace PKHeX
             get { return Data[TrainerCard + 5]; }
             set { Data[TrainerCard + 5] = (byte)value; }
         }
-        public int Sprite
+        public override int MultiplayerSpriteID
         {
             get { return Data[TrainerCard + 7]; }
             set { Data[TrainerCard + 7] = (byte)value; }
         }
-        public override ulong? GameSyncID
+        public override int GameSyncIDSize => 16; // 64 bits
+        public override string GameSyncID
         {
-            get { return BitConverter.ToUInt64(Data, TrainerCard + 8); }
-            set { BitConverter.GetBytes(value ?? 0).CopyTo(Data, TrainerCard + 8); }
+            get
+            {
+                var data = Data.Skip(TrainerCard + 8).Take(GameSyncIDSize / 2).Reverse().ToArray();
+                return BitConverter.ToString(data).Replace("-", "");
+            }
+            set
+            {
+                if (value == null)
+                    return;
+                if (value.Length > GameSyncIDSize)
+                    return;
+                Enumerable.Range(0, value.Length)
+                     .Where(x => x % 2 == 0)
+                     .Reverse()
+                     .Select(x => Convert.ToByte(value.Substring(x, 2), 16))
+                     .ToArray().CopyTo(Data, TrainerCard + 8);
+            }
         }
         public override int SubRegion
         {
@@ -375,6 +397,11 @@ namespace PKHeX
         {
             get { return Util.TrimFromZero(Encoding.Unicode.GetString(Data, TrainerCard + 0x48, 0x1A)); }
             set { Encoding.Unicode.GetBytes(value.PadRight(13, '\0')).CopyTo(Data, TrainerCard + 0x48); }
+        }
+        public string OT_Nick
+        {
+            get { return Util.TrimFromZero(Encoding.Unicode.GetString(Data, TrainerCard + 0x62, 0x1A)); }
+            set { Encoding.Unicode.GetBytes(value.PadRight(value.Length + 1, '\0')).CopyTo(Data, TrainerCard + 0x62); }
         }
         public string Saying1
         {
@@ -483,13 +510,44 @@ namespace PKHeX
             get { return Data[PlayTime + 3]; }
             set { Data[PlayTime + 3] = (byte)value; }
         }
-        public uint LastSaved { get { return BitConverter.ToUInt32(Data, PlayTime + 0x4); } set { BitConverter.GetBytes(value).CopyTo(Data, PlayTime + 0x4); } }
-        public int LastSavedYear { get { return (int)(LastSaved & 0xFFF); } set { LastSaved = LastSaved & 0xFFFFF000 | (uint)value; } }
-        public int LastSavedMonth { get { return (int)(LastSaved >> 12 & 0xF); } set { LastSaved = LastSaved & 0xFFFF0FFF | ((uint)value & 0xF) << 12; } }
-        public int LastSavedDay { get { return (int)(LastSaved >> 16 & 0x1F); } set { LastSaved = LastSaved & 0xFFE0FFFF | ((uint)value & 0x1F) << 16; } }
-        public int LastSavedHour { get { return (int)(LastSaved >> 21 & 0x1F); } set { LastSaved = LastSaved & 0xFC1FFFFF | ((uint)value & 0x1F) << 21; } }
-        public int LastSavedMinute { get { return (int)(LastSaved >> 26 & 0x3F); } set { LastSaved = LastSaved & 0x03FFFFFF | ((uint)value & 0x3F) << 26; } }
-        public string LastSavedTime => $"{LastSavedYear.ToString("0000")}{LastSavedMonth.ToString("00")}{LastSavedDay.ToString("00")}{LastSavedHour.ToString("00")}{LastSavedMinute.ToString("00")}";
+        private uint LastSaved { get { return BitConverter.ToUInt32(Data, PlayTime + 0x4); } set { BitConverter.GetBytes(value).CopyTo(Data, PlayTime + 0x4); } }
+        private int LastSavedYear { get { return (int)(LastSaved & 0xFFF); } set { LastSaved = LastSaved & 0xFFFFF000 | (uint)value; } }
+        private int LastSavedMonth { get { return (int)(LastSaved >> 12 & 0xF); } set { LastSaved = LastSaved & 0xFFFF0FFF | ((uint)value & 0xF) << 12; } }
+        private int LastSavedDay { get { return (int)(LastSaved >> 16 & 0x1F); } set { LastSaved = LastSaved & 0xFFE0FFFF | ((uint)value & 0x1F) << 16; } }
+        private int LastSavedHour { get { return (int)(LastSaved >> 21 & 0x1F); } set { LastSaved = LastSaved & 0xFC1FFFFF | ((uint)value & 0x1F) << 21; } }
+        private int LastSavedMinute { get { return (int)(LastSaved >> 26 & 0x3F); } set { LastSaved = LastSaved & 0x03FFFFFF | ((uint)value & 0x3F) << 26; } }
+        private string LastSavedTime => $"{LastSavedYear:0000}{LastSavedMonth:00}{LastSavedDay:00}{LastSavedHour:00}{LastSavedMinute:00}";
+        public DateTime? LastSavedDate
+        {
+            get
+            {
+                return !Util.IsDateValid(LastSavedYear, LastSavedMonth, LastSavedDay)
+                    ? (DateTime?)null
+                    : new DateTime(LastSavedYear, LastSavedMonth, LastSavedDay, LastSavedHour, LastSavedMinute, 0);
+            }
+            set
+            {
+                // Only update the properties if a value is provided.
+                if (value.HasValue)
+                {
+                    var dt = value.Value;
+                    LastSavedYear = dt.Year;
+                    LastSavedMonth = dt.Month;
+                    LastSavedDay = dt.Day;
+                    LastSavedHour = dt.Hour;
+                    LastSavedMinute = dt.Minute;
+                }
+                else // Clear the date.
+                {
+                    // If code tries to access MetDate again, null will be returned.
+                    LastSavedYear = 0;
+                    LastSavedMonth = 0;
+                    LastSavedDay = 0;
+                    LastSavedHour = 0;
+                    LastSavedMinute = 0;
+                }
+            }
+        }
 
         public int ResumeYear { get { return BitConverter.ToInt32(Data, AdventureInfo + 0x4); } set { BitConverter.GetBytes(value).CopyTo(Data,AdventureInfo + 0x4); } }
         public int ResumeMonth { get { return Data[AdventureInfo + 0x8]; } set { Data[AdventureInfo + 0x8] = (byte)value; } }
@@ -582,7 +640,7 @@ namespace PKHeX
                 Data[ofs + 0x1E0] = (byte)(hasEgg ? 1 : 0);
         }
 
-        public byte[] Puffs { get { return Data.Skip(Puff).Take(100).ToArray(); } set { value.CopyTo(Data, Puff); } }
+        public byte[] Puffs { get { return getData(Puff, 100); } set { value.CopyTo(Data, Puff); } }
         public int PuffCount { get { return BitConverter.ToInt32(Data, Puff + 100); } set { BitConverter.GetBytes(value).CopyTo(Data, Puff + 100); } }
 
         public int[] SelectItems
@@ -623,7 +681,7 @@ namespace PKHeX
         }
 
         public override string JPEGTitle => JPEG < 0 ? null : Util.TrimFromZero(Encoding.Unicode.GetString(Data, JPEG, 0x1A));
-        public override byte[] JPEGData => JPEG < 0 || Data[JPEG + 0x54] != 0xFF ? null : Data.Skip(JPEG + 0x54).Take(0xE004).ToArray();
+        public override byte[] JPEGData => JPEG < 0 || Data[JPEG + 0x54] != 0xFF ? null : getData(JPEG + 0x54, 0xE004);
 
         // Inventory
         public override InventoryPouch[] Inventory
@@ -699,8 +757,6 @@ namespace PKHeX
                     pk6.CurrentFriendship = pk6.OppositeFriendship;
                 else if (pk6.Moves.Contains(218)) // Frustration
                     pkm.CurrentFriendship = pk6.OppositeFriendship;
-                else if (pk6.CurrentHandler == 1) // OT->HT, needs new Friendship/Affection
-                    pk6.TradeFriendshipAffection(OT);
             }
             pkm.RefreshChecksum();
         }
@@ -721,25 +777,29 @@ namespace PKHeX
             int origin = pkm.Version;
             int gender = pkm.Gender % 2; // genderless -> male
             int shiny = pkm.IsShiny ? 1 : 0;
-            int shiftoff = shiny * brSize * 2 + gender * brSize + brSize;
-
-            // Set the [Species/Gender/Shiny] Owned Flag
-            Data[PokeDex + shiftoff + bit / 8 + 0x8] |= (byte)(1 << (bit % 8));
-
+            int shiftoff = brSize*(1 + gender + 2*shiny); // after the Owned region
+            int bd = bit >> 3; // div8
+            int bm = bit & 7; // mod8
+            byte mask = (byte)(1 << bm);
+            int ofs = PokeDex + 0x8 + bd;
+            
             // Owned quality flag
             if (origin < 0x18 && bit < 649 && !ORAS) // Species: 1-649 for X/Y, and not for ORAS; Set the Foreign Owned Flag
-                Data[PokeDex + 0x64C + bit / 8] |= (byte)(1 << (bit % 8));
+                Data[ofs + 0x644] |= mask;
             else if (origin >= 0x18 || ORAS) // Set Native Owned Flag (should always happen)
-                Data[PokeDex + bit / 8 + 0x8] |= (byte)(1 << (bit % 8));
+                Data[ofs + brSize * 0] |= mask;
+
+            // Set the [Species/Gender/Shiny] Seen Flag
+            Data[ofs + shiftoff] |= mask;
 
             // Set the Display flag if none are set
             bool Displayed = false;
-            Displayed |= (Data[PokeDex + brSize * 5 + bit / 8 + 0x8] & (byte)(1 << (bit % 8))) != 0;
-            Displayed |= (Data[PokeDex + brSize * 6 + bit / 8 + 0x8] & (byte)(1 << (bit % 8))) != 0;
-            Displayed |= (Data[PokeDex + brSize * 7 + bit / 8 + 0x8] & (byte)(1 << (bit % 8))) != 0;
-            Displayed |= (Data[PokeDex + brSize * 8 + bit / 8 + 0x8] & (byte)(1 << (bit % 8))) != 0;
+            Displayed |= (Data[ofs + brSize * 5] & mask) != 0;
+            Displayed |= (Data[ofs + brSize * 6] & mask) != 0;
+            Displayed |= (Data[ofs + brSize * 7] & mask) != 0;
+            Displayed |= (Data[ofs + brSize * 8] & mask) != 0;
             if (!Displayed) // offset is already biased by brSize, reuse shiftoff but for the display flags.
-                Data[PokeDex + shiftoff + brSize * 4 + bit / 8 + 0x8] |= (byte)(1 << (bit % 8));
+                Data[ofs + brSize * 4 + shiftoff] |= mask;
 
             // Set the Language
             if (lang < 0) lang = 1;
@@ -772,6 +832,39 @@ namespace PKHeX
             }
             bit = f + pkm.AltForm;
             Data[FormDex + FormLen * (2 + shiny) + bit / 8] |= (byte)(1 << (bit % 8));
+        }
+
+        public override bool getCaught(int species)
+        {
+            int bit = species - 1;
+            int bd = bit >> 3; // div8
+            int bm = bit & 7; // mod8
+            int ofs = PokeDex // Raw Offset
+                      + 0x08; // Magic + Flags
+
+            if ((1 << bm & Data[ofs + bd]) != 0)
+                return true; // Owned Native
+
+            if (ORAS || bit >= 649) // no Foreign flag
+                return false;
+            return (1 << bm & Data[ofs + bd + 0x644]) != 0;
+        }
+
+        public override bool getSeen(int species)
+        {
+            const int brSize = 0x60;
+
+            int bit = species - 1;
+            int bd = bit >> 3; // div8
+            int bm = bit & 7; // mod8
+            byte mask = (byte)(1 << bm);
+            int ofs = PokeDex // Raw Offset
+                      + 0x08; // Magic + Flags
+
+            for (int i = 1; i <= 4; i++) // check all 4 seen flags (gender/shiny)
+                if ((Data[ofs + bd + i * brSize] & mask) != 0)
+                    return true;
+            return false;
         }
         public override byte[] decryptPKM(byte[] data)
         {
@@ -860,7 +953,7 @@ namespace PKHeX
             {
                 if (LinkInfo < 0)
                     return null;
-                return Data.Skip(LinkInfo).Take(0xC48).ToArray();
+                return getData(LinkInfo, 0xC48);
             }
             set
             {
@@ -879,7 +972,7 @@ namespace PKHeX
             if (index < 0 || index > GiftCountMax)
                 return null;
 
-            return new WC6(Data.Skip(WondercardData + index * WC6.Size).Take(WC6.Size).ToArray());
+            return new WC6(getData(WondercardData + index * WC6.Size, WC6.Size));
         }
         private void setWC6(MysteryGift wc6, int index)
         {
@@ -891,7 +984,7 @@ namespace PKHeX
             wc6.Data.CopyTo(Data, WondercardData + index * WC6.Size);
 
             for (int i = 0; i < GiftCountMax; i++)
-                if (BitConverter.ToUInt16(Data, WondercardData + i * WC6.Size) == 0)
+                if (getData(WondercardData + i * WC6.Size, WC6.Size).All(b => b == 0)) // empty
                     for (int j = i + 1; j < GiftCountMax - i; j++) // Shift everything down
                         Array.Copy(Data, WondercardData + j * WC6.Size, Data, WondercardData + (j - 1) * WC6.Size, WC6.Size);
 
@@ -906,7 +999,7 @@ namespace PKHeX
             for (int i = 0; i < Data.Length / 0x200; i++)
             {
                 if (!FFFF.SequenceEqual(Data.Skip(i * 0x200).Take(0x200))) continue;
-                r = $"0x200 chunk @ 0x{(i*0x200).ToString("X5")} is FF'd."
+                r = $"0x200 chunk @ 0x{i*0x200:X5} is FF'd."
                     + Environment.NewLine + "Cyber will screw up (as of August 31st 2014)." + Environment.NewLine + Environment.NewLine;
 
                 // Check to see if it is in the Pokedex
@@ -923,7 +1016,7 @@ namespace PKHeX
         public override string MiscSaveInfo()
         {
             return Blocks.Aggregate("", (current, b) => current +
-                $"{b.ID.ToString("00")}: {b.Offset.ToString("X5")}-{(b.Offset + b.Length).ToString("X5")}, {b.Length.ToString("X5")}{Environment.NewLine}");
+                $"{b.ID:00}: {b.Offset:X5}-{b.Offset + b.Length:X5}, {b.Length:X5}{Environment.NewLine}");
         }
     }
 }

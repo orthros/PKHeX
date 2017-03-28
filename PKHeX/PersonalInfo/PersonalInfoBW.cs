@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class PersonalInfoBW : PersonalInfo
     {
@@ -43,12 +43,12 @@ namespace PKHeX
         public override int CatchRate { get { return Data[0x08]; } set { Data[0x08] = (byte)value; } }
         public override int EvoStage { get { return Data[0x09]; } set { Data[0x09] = (byte)value; } }
         private int EVYield { get { return BitConverter.ToUInt16(Data, 0x0A); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0x0A); } }
-        public override int EV_HP { get { return EVYield >> 0 & 0x3; } set { EVYield = (EVYield & (0x3 << 0)) | (value & 0x3); } }
-        public override int EV_ATK { get { return EVYield >> 2 & 0x3; } set { EVYield = (EVYield & (0x3 << 2)) | (value & 0x3); } }
-        public override int EV_DEF { get { return EVYield >> 4 & 0x3; } set { EVYield = (EVYield & (0x3 << 4)) | (value & 0x3); } }
-        public override int EV_SPE { get { return EVYield >> 6 & 0x3; } set { EVYield = (EVYield & (0x3 << 6)) | (value & 0x3); } }
-        public override int EV_SPA { get { return EVYield >> 8 & 0x3; } set { EVYield = (EVYield & (0x3 << 8)) | (value & 0x3); } }
-        public override int EV_SPD { get { return EVYield >> 16 & 0x3; } set { EVYield = (EVYield & (0x3 << 10)) | (value & 0x3); } }
+        public override int EV_HP { get { return EVYield >> 0 & 0x3; } set { EVYield = (EVYield & ~(0x3 << 0)) | (value & 0x3) << 0; } }
+        public override int EV_ATK { get { return EVYield >> 2 & 0x3; } set { EVYield = (EVYield & ~(0x3 << 2)) | (value & 0x3) << 2; } }
+        public override int EV_DEF { get { return EVYield >> 4 & 0x3; } set { EVYield = (EVYield & ~(0x3 << 4)) | (value & 0x3) << 4; } }
+        public override int EV_SPE { get { return EVYield >> 6 & 0x3; } set { EVYield = (EVYield & ~(0x3 << 6)) | (value & 0x3) << 6; } }
+        public override int EV_SPA { get { return EVYield >> 8 & 0x3; } set { EVYield = (EVYield & ~(0x3 << 8)) | (value & 0x3) << 8; } }
+        public override int EV_SPD { get { return EVYield >> 10 & 0x3; } set { EVYield = (EVYield & ~(0x3 << 10)) | (value & 0x3) << 10; } }
         public override int[] Items
         {
             get { return new int[] { BitConverter.ToInt16(Data, 0xC), BitConverter.ToInt16(Data, 0xE), BitConverter.ToInt16(Data, 0x10) }; }
@@ -56,8 +56,8 @@ namespace PKHeX
             {
                 if (value?.Length != 3) return;
                 BitConverter.GetBytes((short)value[0]).CopyTo(Data, 0xC);
-                BitConverter.GetBytes((short)value[0]).CopyTo(Data, 0xE);
-                BitConverter.GetBytes((short)value[0]).CopyTo(Data, 0x10);
+                BitConverter.GetBytes((short)value[1]).CopyTo(Data, 0xE);
+                BitConverter.GetBytes((short)value[2]).CopyTo(Data, 0x10);
             }
         }
         public override int Gender { get { return Data[0x12]; } set { Data[0x12] = (byte)value; } }
@@ -79,7 +79,7 @@ namespace PKHeX
             get { return new int[] { Data[0x18], Data[0x19], Data[0x1A] }; }
             set
             {
-                if (value?.Length != 2) return;
+                if (value?.Length != 3) return;
                 Data[0x18] = (byte)value[0];
                 Data[0x19] = (byte)value[1];
                 Data[0x1A] = (byte)value[2];

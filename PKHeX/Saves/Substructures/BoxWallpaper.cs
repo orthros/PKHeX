@@ -1,10 +1,8 @@
-﻿using System.Drawing;
-
-namespace PKHeX
+﻿namespace PKHeX.Core
 {
     public static class BoxWallpaper
     {
-        public static Bitmap getWallpaper(SaveFile SAV, int index)
+        public static string getWallpaper(SaveFile SAV, int index)
         {
             index++;
             string s = "box_wp" + index.ToString("00");
@@ -33,7 +31,59 @@ namespace PKHeX
                         s += "rs";
                     break;
             }
-            return (Bitmap)(Properties.Resources.ResourceManager.GetObject(s) ?? Properties.Resources.box_wp16xy);
+            return s;
+        }
+        public static bool getWallpaperRed(SaveFile SAV, int box)
+        {
+            switch (SAV.Generation)
+            {
+                case 3:
+                    if (SAV.GameCube)
+                        return box == 7 && SAV is SAV3XD; // flame pattern in XD
+                    switch (SAV.getBoxWallpaper(box))
+                    {
+                        case 5: // Volcano
+                            return true;
+                        case 13: // PokéCenter
+                            return SAV.E;
+                    }
+                    break;
+                case 4:
+                    switch (SAV.getBoxWallpaper(box))
+                    {
+                        case 5: // Volcano
+                        case 12: // Checks
+                        case 13: // PokéCenter
+                        case 22: // Special
+                            return true;
+                    }
+                    break;
+                case 5:
+                    switch (SAV.getBoxWallpaper(box))
+                    {
+                        case 5: // Volcano
+                        case 12: // Checks
+                            return true;
+                        case 19: // PWT
+                        case 22: // Reshiram
+                            return SAV.B2W2;
+                        case 21: // Zoroark
+                        case 23: // Musical
+                            return SAV.BW;
+                    }
+                    break;
+                case 6:
+                case 7:
+                    switch (SAV.getBoxWallpaper(box))
+                    {
+                        case 5: // Volcano
+                        case 12: // PokéCenter
+                        case 20: // Special5 Flare/Magma
+                            return true;
+                    }
+                    break;
+            }
+            return false;
         }
     }
 }

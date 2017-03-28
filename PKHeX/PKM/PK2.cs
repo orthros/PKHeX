@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class PK2 : PKM
     {
@@ -23,8 +23,15 @@ namespace PKHeX
         public override int Format => 2;
 
         public bool Japanese => otname.Length == STRLEN_J;
-
-        public override string FileName => $"{Species.ToString("000")} - {Nickname} - {SaveUtil.ccitt16(Encrypt()).ToString("X4")}.{Extension}";
+        public override string FileName
+        {
+            get
+            {
+                string form = AltForm > 0 ? $"-{AltForm:00}" : "";
+                string star = IsShiny ? " ★" : "";
+                return $"{Species:000}{form}{star} - {Nickname} - {SaveUtil.ccitt16(Encrypt()):X4}.{Extension}";
+            }
+        }
 
         public PK2(byte[] decryptedData = null, string ident = null, bool jp = false)
         {
@@ -104,27 +111,27 @@ namespace PKHeX
         {
             get
             {
-                string spName = PKX.getSpeciesName(Species, Japanese ? 1 : 2).ToUpper();
-                spName = spName.Replace(" ", ""); // Gen I/II didn't have a space for Mr. Mime
+                string spName = PKX.getSpeciesNameGeneration(Species, Japanese ? 1 : 2, Format);
                 return !nick.SequenceEqual(
                         PKX.setG1Str(spName, Japanese)
                             .Concat(Enumerable.Repeat((byte) 0x50, StringLength - spName.Length - 1))
                             .Select(b => (byte)(b == 0xF2 ? 0xE8 : b)));
             }
-            set { }
+            set 
+            {
+                if (!value)
+                    setNotNicknamed();
+            }
         }
-
         public void setNotNicknamed()
         {
-            string spName = PKX.getSpeciesName(Species, Japanese ? 1 : 2).ToUpper();
-            spName = spName.Replace(" ", ""); // Gen I/II didn't have a space for Mr. Mime
+            string spName = PKX.getSpeciesNameGeneration(Species, Japanese ? 1 : 2, Format);
             nick = PKX.setG1Str(spName, Japanese)
                       .Concat(Enumerable.Repeat((byte)0x50, StringLength - spName.Length - 1))
                       .Select(b => (byte)(b == 0xF2 ? 0xE8 : b)) // Decimal point<->period fix
                       .ToArray();
         }
-
-
+        
         #region Stored Attributes
         public override int Species
         {
@@ -221,14 +228,15 @@ namespace PKHeX
         {
             int gv = PersonalInfo.Gender;
 
-            if (gv == 255)
-                return Gender == 2;
-            if (gv == 254)
-                return Gender == 1;
-            if (gv == 0)
-                return Gender == 0;
             switch (gv)
             {
+                case 255:
+                    return Gender == 2;
+                case 254:
+                    return Gender == 1;
+                case 0:
+                    return Gender == 0;
+
                 case 31:
                     return IV_ATK >= 2 ? Gender == 0 : Gender == 1;
                 case 63:
@@ -270,8 +278,8 @@ namespace PKHeX
             }
             set { }
         }
-
-        public bool hasMetData => CaughtData != 0;
+        
+        public override bool HasOriginalMetLocation => CaughtData != 0;
 
         #region Future, Unused Attributes
         public override uint EncryptionConstant { get { return 0; } set { } }
@@ -297,12 +305,15 @@ namespace PKHeX
             set{ }
         }
 
+        private int HPVal => getHiddenPowerBitVal(new[] {IV_SPC, IV_SPE, IV_DEF, IV_ATK});
+        public override int HPPower => (5 * HPVal + IV_SPC % 4) / 2 + 31;
         public override int HPType
         {
-            get { return 4 * (IV_ATK % 4) + (IV_DEF % 4); }
+            get { return ((IV_ATK & 3) << 2) | (IV_DEF & 3); }
             set
             {
-
+                IV_DEF = ((IV_DEF >> 2) << 2) | (value & 3);
+                IV_DEF = ((IV_ATK >> 2) << 2) | ((value >> 2) & 3);
             }
         }
         public override bool IsShiny => IV_DEF == 10 && IV_SPE == 10 && IV_SPC == 10 && (IV_ATK & 2) == 2;
@@ -320,7 +331,7 @@ namespace PKHeX
         public override int Egg_Location { get { return 0; } set { } }
         public override int OT_Friendship { get { return 0; } set { } }
         public override int Ball { get { return 0; } set { } }
-        public override int Version { get { return 0; } set { } }
+        public override int Version { get { return (int)GameVersion.GSC; } set { } }
         public override int SID { get { return 0; } set { } }
         public override int CNT_Cool { get { return 0; } set { } }
         public override int CNT_Beauty { get { return 0; } set { } }

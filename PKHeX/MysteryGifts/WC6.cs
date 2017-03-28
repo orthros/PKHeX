@@ -2,13 +2,13 @@
 using System.Linq;
 using System.Text;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public sealed class WC6 : MysteryGift
     {
-        internal const int Size = 0x108;
-        internal const int SizeFull = 0x310;
-        internal const uint EonTicketConst = 0x225D73C2;
+        public const int Size = 0x108;
+        public const int SizeFull = 0x310;
+        public const uint EonTicketConst = 0x225D73C2;
         public override int Format => 6;
 
         public WC6(byte[] data = null)
@@ -16,12 +16,16 @@ namespace PKHeX
             Data = (byte[])(data?.Clone() ?? new byte[Size]);
             if (Data.Length == SizeFull)
             {
+                if (Data[0x205] == 0)
+                    Data = new byte[Data.Length]; // Invalidate
                 Data = Data.Skip(SizeFull - Size).ToArray();
                 DateTime now = DateTime.Now;
                 Year = (uint)now.Year;
                 Month = (uint)now.Month;
                 Day = (uint)now.Day;
             }
+            if (Year < 2000)
+                Data = new byte[Data.Length]; // Invalidate
         }
         
         // General Card Properties
@@ -94,7 +98,7 @@ namespace PKHeX
         
         // Pokémon Properties
         public override bool IsPokémon { get { return CardType == 0; } set { if (value) CardType = 0; } }
-        public override bool IsShiny { get { return PIDType == 2; } }
+        public override bool IsShiny => PIDType == 2;
         public int TID { 
             get { return BitConverter.ToUInt16(Data, 0x68); } 
             set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0x68); } }
@@ -196,6 +200,13 @@ namespace PKHeX
         public int OT_TextVar { get { return BitConverter.ToUInt16(Data, 0xE2); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0xE2); } }
         public int OT_Feeling { get { return Data[0xE4]; } set { Data[0xE4] = (byte)value; } }
 
+        public int EV_HP { get { return Data[0xE5]; } set { Data[0xE5] = (byte)value; } }
+        public int EV_ATK { get { return Data[0xE6]; } set { Data[0xE6] = (byte)value; } }
+        public int EV_DEF { get { return Data[0xE7]; } set { Data[0xE7] = (byte)value; } }
+        public int EV_SPE { get { return Data[0xE8]; } set { Data[0xE8] = (byte)value; } }
+        public int EV_SPA { get { return Data[0xE9]; } set { Data[0xE9] = (byte)value; } }
+        public int EV_SPD { get { return Data[0xEA]; } set { Data[0xEA] = (byte)value; } }
+
         private byte RIB0 { get { return Data[0x74]; } set { Data[0x74] = value; } }
         public bool RibbonChampionBattle { get { return (RIB0 & (1 << 0)) == 1 << 0; } set { RIB0 = (byte)(RIB0 & ~(1 << 0) | (value ? 1 << 0 : 0)); } } // Battle Champ Ribbon
         public bool RibbonChampionRegional { get { return (RIB0 & (1 << 1)) == 1 << 1; } set { RIB0 = (byte)(RIB0 & ~(1 << 1) | (value ? 1 << 1 : 0)); } } // Regional Champ Ribbon
@@ -216,12 +227,38 @@ namespace PKHeX
         public bool RIB1_7 { get { return (RIB1 & (1 << 7)) == 1 << 7; } set { RIB1 = (byte)(RIB1 & ~(1 << 7) | (value ? 1 << 7 : 0)); } } // Empty
 
         // Meta Accessible Properties
-        public int[] IVs => new[] { IV_HP, IV_ATK, IV_DEF, IV_SPE, IV_SPA, IV_SPD };
+        public int[] IVs
+        {
+            get { return new[] { IV_HP, IV_ATK, IV_DEF, IV_SPE, IV_SPA, IV_SPD }; }
+            set
+            {
+                if (value?.Length != 6) return;
+                IV_HP = value[0]; IV_ATK = value[1]; IV_DEF = value[2];
+                IV_SPE = value[3]; IV_SPA = value[4]; IV_SPD = value[5];
+            }
+        }
+        public int[] EVs
+        {
+            get { return new[] { EV_HP, EV_ATK, EV_DEF, EV_SPE, EV_SPA, EV_SPD }; }
+            set
+            {
+                if (value?.Length != 6) return;
+                EV_HP = value[0]; EV_ATK = value[1]; EV_DEF = value[2];
+                EV_SPE = value[3]; EV_SPA = value[4]; EV_SPD = value[5];
+            }
+        }
         public bool IsNicknamed => Nickname.Length > 0;
 
         public override int[] Moves
         {
-            get { return new[] {Move1, Move2, Move3, Move4}; }
+            get { return new[] { Move1, Move2, Move3, Move4 }; }
+            set
+            {
+                if (value.Length > 0) Move1 = value[0];
+                if (value.Length > 1) Move2 = value[1];
+                if (value.Length > 2) Move3 = value[2];
+                if (value.Length > 3) Move4 = value[3];
+            }
         }
         public override int[] RelearnMoves
         {
@@ -241,6 +278,7 @@ namespace PKHeX
                 return null;
 
             int currentLevel = Level > 0 ? Level : (int)(Util.rnd32()%100 + 1);
+            var pi = PersonalTable.AO[Species];
             PK6 pk = new PK6
             {
                 Species = Species,
@@ -249,11 +287,11 @@ namespace PKHeX
                 SID = SID,
                 Met_Level = currentLevel,
                 Nature = Nature != 0xFF ? Nature : (int)(Util.rnd32() % 25),
-                Gender = PersonalTable.AO[Species].Gender == 255 ? 2 : (Gender != 3 ? Gender : PersonalTable.AO[Species].RandomGender),
+                Gender = Gender != 3 ? Gender : pi.RandomGender,
                 AltForm = Form,
-                EncryptionConstant = EncryptionConstant == 0 ? Util.rnd32() : EncryptionConstant,
-                Version = OriginGame == 0 ? SAV.Game : OriginGame,
-                Language = Language == 0 ? SAV.Language : Language,
+                EncryptionConstant = EncryptionConstant != 0 ? EncryptionConstant : Util.rnd32(),
+                Version = OriginGame != 0 ? OriginGame : SAV.Game,
+                Language = Language != 0 ? Language : SAV.Language,
                 Ball = Ball,
                 Country = SAV.Country,
                 Region = SAV.SubRegion,
@@ -297,27 +335,25 @@ namespace PKHeX
                 RibbonChampionNational = RibbonChampionNational,
                 RibbonChampionWorld = RibbonChampionWorld,
                 
-                OT_Friendship = PersonalTable.AO[Species].BaseFriendship,
+                OT_Friendship = pi.BaseFriendship,
                 OT_Intensity = OT_Intensity,
                 OT_Memory = OT_Memory,
                 OT_TextVar = OT_TextVar,
                 OT_Feeling = OT_Feeling,
                 FatefulEncounter = true,
+
+                EVs = EVs,
             };
             pk.Move1_PP = pk.getMovePP(Move1, 0);
             pk.Move2_PP = pk.getMovePP(Move2, 0);
             pk.Move3_PP = pk.getMovePP(Move3, 0);
             pk.Move4_PP = pk.getMovePP(Move4, 0);
 
-            if (Date.HasValue)
+            pk.MetDate = Date ?? DateTime.Now;
+
+            if (SAV.Generation > 6 && OriginGame == 0) // Gen7
             {
-                pk.MetDate = Date.Value;
-            }
-            else
-            {
-                // No datetime set, typical for wc6full
-                // Set it to now, instead of zeroing it out.
-                pk.MetDate = DateTime.Now;
+                pk.Version = (int)GameVersion.OR;
             }
 
             if (pk.CurrentHandler == 0) // OT
@@ -345,11 +381,10 @@ namespace PKHeX
             switch (IVs[0])
             {
                 case 0xFE:
-                    finalIVs[0] = 31;
-                    do { // 31 HP IV, 2 other 31s
-                    for (int i = 1; i < 6; i++)
+                    do { // 3 Perfect IVs
+                    for (int i = 0; i < 6; i++)
                         finalIVs[i] = IVs[i] > 31 ? (int)(Util.rnd32() & 0x1F) : IVs[i];
-                    } while (finalIVs.Count(r => r == 31) < 3); // 31 + 2*31
+                    } while (finalIVs.Count(r => r == 31) < 3); // 3*31
                     break;
                 case 0xFD: 
                     do { // 2 other 31s
@@ -393,7 +428,8 @@ namespace PKHeX
                     pk.PID = (uint)(((TID ^ SID ^ (pk.PID & 0xFFFF)) << 16) + (pk.PID & 0xFFFF));
                     break;
                 case 03: // Random Nonshiny
-                    do { pk.PID = Util.rnd32(); } while ((uint)(((TID ^ SID ^ (pk.PID & 0xFFFF)) << 16) + (pk.PID & 0xFFFF)) < 16);
+                    pk.PID = Util.rnd32();
+                    if ((uint)(((TID ^ SID ^ (pk.PID & 0xFFFF)) << 16) + (pk.PID & 0xFFFF)) < 16) pk.PID ^= 0x10000000;
                     break;
             }
 

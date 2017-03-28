@@ -1,14 +1,14 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class PK1 : PKM
     {
         // Internal use only
         protected internal byte[] otname;
         protected internal byte[] nick;
-        public override PersonalInfo PersonalInfo => PersonalTable.RBY[Species];
+        public override PersonalInfo PersonalInfo => PersonalTable.Y[Species];
 
         public byte[] OT_Name_Raw => (byte[])otname.Clone();
         public byte[] Nickname_Raw => (byte[])nick.Clone();
@@ -24,7 +24,7 @@ namespace PKHeX
 
         public bool Japanese => otname.Length == STRLEN_J;
 
-        public override string FileName => $"{Species.ToString("000")} - {Nickname} - {SaveUtil.ccitt16(Encrypt()).ToString("X4")}.{Extension}";
+        public override string FileName => $"{Species:000} - {Nickname} - {SaveUtil.ccitt16(Encrypt()):X4}.{Extension}";
 
         public PK1(byte[] decryptedData = null, string ident = null, bool jp = false)
         {
@@ -101,20 +101,31 @@ namespace PKHeX
         {
             get
             {
-                string spName = PKX.getSpeciesName(Species, Japanese ? 1 : 2).ToUpper();
-                spName = spName.Replace(" ", ""); // Gen I/II didn't have a space for Mr. Mime
+                string spName = PKX.getSpeciesNameGeneration(Species, Japanese ? 1 : 2, Format);
                 return !nick.SequenceEqual(
                         PKX.setG1Str(spName, Japanese)
                             .Concat(Enumerable.Repeat((byte) 0x50, StringLength - spName.Length - 1))
                             .Select(b => (byte)(b == 0xF2 ? 0xE8 : b)));
             }
-            set { }
+            set
+            {
+                if (!value)
+                    setNotNicknamed();
+            }
+        }
+
+        public bool IsNicknamedBank
+        {
+            get
+            {
+                var spName = PKX.getSpeciesNameGeneration(Species, Japanese ? 1 : 2, Format);
+                return Nickname != spName;
+            }
         }
 
         public void setNotNicknamed()
         {
-            string spName = PKX.getSpeciesName(Species, Japanese ? 1 : 2).ToUpper();
-            spName = spName.Replace(" ", ""); // Gen I/II didn't have a space for Mr. Mime
+            string spName = PKX.getSpeciesNameGeneration(Species, Japanese ? 1 : 2, Format);
             nick = PKX.setG1Str(spName, Japanese)
                       .Concat(Enumerable.Repeat((byte)0x50, StringLength - spName.Length - 1))
                       .Select(b => (byte)(b == 0xF2 ? 0xE8 : b)) // Decimal point<->period fix
@@ -231,8 +242,8 @@ namespace PKHeX
             return false;
         }
 
+        public override bool IsShiny => IV_ATK == 10 && IV_SPE == 10 && IV_SPC == 10 && (IV_DEF & 2) == 2;
         public override ushort Sanity { get { return 0; } set { } }
-
         public override bool ChecksumValid => true;
         public override ushort Checksum { get { return 0; } set { } }
         public override int Language { get { return 0; } set { } }
@@ -249,7 +260,7 @@ namespace PKHeX
         public override int OT_Friendship { get { return 0; } set { } }
         public override int OT_Gender { get { return 0; } set { } }
         public override int Ball { get { return 0; } set { } }
-        public override int Version { get { return 0; } set { } }
+        public override int Version { get { return (int)GameVersion.RBY; } set { } }
         public override int SID { get { return 0; } set { } }
         public override int PKRS_Strain { get { return 0; } set { } }
         public override int PKRS_Days { get { return 0; } set { } }
@@ -298,6 +309,99 @@ namespace PKHeX
             Array.Copy(nick, 0, pk2.nick, 0, nick.Length);
 
             return pk2;
+        }
+
+        public PK7 convertToPK7()
+        {
+            var pk7 = new PK7
+            {
+                EncryptionConstant = Util.rnd32(),
+                Species = Species,
+                TID = TID,
+                CurrentLevel = CurrentLevel,
+                EXP = EXP,
+                Met_Level = CurrentLevel,
+                Nature = (int) (EXP%25),
+                PID = Util.rnd32(),
+                Ball = 4,
+                MetDate = DateTime.Now,
+                Version = (int)GameVersion.RD, // Default to red, for now?
+                Move1 = Move1,
+                Move2 = Move2,
+                Move3 = Move3,
+                Move4 = Move4,
+                Move1_PPUps = Move1_PPUps,
+                Move2_PPUps = Move2_PPUps,
+                Move3_PPUps = Move3_PPUps,
+                Move4_PPUps = Move4_PPUps,
+                Move1_PP = Move1_PP,
+                Move2_PP = Move2_PP,
+                Move3_PP = Move3_PP,
+                Move4_PP = Move4_PP,
+                Met_Location = 30013, // "Kanto region", hardcoded.
+                Gender = PersonalTable.SM[Species].RandomGender,
+                OT_Name = PKX.getG1ConvertedString(otname, Japanese),
+                IsNicknamed = false,
+
+                Country = PKMConverter.Country,
+                Region = PKMConverter.Region,
+                ConsoleRegion = PKMConverter.ConsoleRegion,
+                CurrentHandler = 1,
+                HT_Name = PKMConverter.OT_Name,
+                HT_Gender = PKMConverter.OT_Gender,
+                Language = PKMConverter.Language,
+                Geo1_Country = PKMConverter.Country,
+                Geo1_Region = PKMConverter.Region
+            };
+            pk7.Nickname = PKX.getSpeciesNameGeneration(pk7.Species, pk7.Language, pk7.Format);
+            if (otname[0] == 0x5D) // Ingame Trade
+            {
+                var s = PKX.getG1Char(0x5D, Japanese);
+                pk7.OT_Name = s.Substring(0, 1) + s.Substring(1).ToLower();
+            }
+            pk7.OT_Friendship = pk7.HT_Friendship = PersonalTable.SM[Species].BaseFriendship;
+
+            // IVs
+            var new_ivs = new int[6];
+            int flawless = Species == 151 ? 5 : 3;
+            for (var i = 0; i < new_ivs.Length; i++) new_ivs[i] = (int)(Util.rnd32() & 31);
+            for (var i = 0; i < flawless; i++) new_ivs[i] = 31;
+            Util.Shuffle(new_ivs);
+            pk7.IVs = new_ivs;
+
+            // Really? :(
+            if (IsShiny)
+                pk7.setShinyPID();
+
+            int abil = 2; // Hidden
+            if (Legal.TransferSpeciesDefaultAbility_1.Contains(Species))
+                abil = 0; // Reset
+            pk7.RefreshAbility(abil); // 0/1/2 (not 1/2/4)
+
+            if (Species == 151) // Mew gets special treatment.
+                pk7.FatefulEncounter = true;
+            else if (IsNicknamedBank)
+            {
+                pk7.IsNicknamed = true;
+                pk7.Nickname = PKX.getG1ConvertedString(nick, Japanese);
+            }
+            
+            pk7.TradeMemory(Bank:true); // oh no, memories on gen7 pkm
+
+            if (pk7.Species == 150) // Pay Day Mewtwo
+            {
+                var moves = pk7.Moves;
+                var index = Array.IndexOf(moves, 6);
+                if (index != -1)
+                {
+                    moves[index] = 0;
+                    pk7.Moves = moves;
+                    pk7.FixMoves();
+                }
+            }
+            
+            pk7.RefreshChecksum();
+            return pk7;
         }
     }
 

@@ -1,11 +1,11 @@
 ﻿using System;
-using System.Drawing;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public abstract class PKM
     {
+        public static readonly string[] Extensions = PKX.getPKMExtensions();
         public abstract int SIZE_PARTY { get; }
         public abstract int SIZE_STORED { get; }
         public virtual string Extension => "pk" + Format;
@@ -127,10 +127,11 @@ namespace PKHeX
         public abstract int OT_Friendship { get; set; }
 
         // Future Properties
-        protected virtual int Met_Year { get { return 0; } set { } }
-        protected virtual int Met_Month { get { return 0; } set { } }
-        protected virtual int Met_Day { get { return 0; } set { } }
+        public virtual int Met_Year { get { return 0; } set { } }
+        public virtual int Met_Month { get { return 0; } set { } }
+        public virtual int Met_Day { get { return 0; } set { } }
         public virtual string HT_Name { get; set; }
+        public virtual int HT_Gender { get; set; }
         public virtual int HT_Affection { get; set; }
         public virtual int HT_Friendship { get; set; }
         public virtual int HT_Memory { get; set; }
@@ -199,9 +200,9 @@ namespace PKHeX
             }
         }
 
-        protected virtual int Egg_Year { get { return 0; } set { } }
-        protected virtual int Egg_Month { get { return 0; } set { } }
-        protected virtual int Egg_Day { get { return 0; } set { } }
+        public virtual int Egg_Year { get { return 0; } set { } }
+        public virtual int Egg_Month { get { return 0; } set { } }
+        public virtual int Egg_Day { get { return 0; } set { } }
 
         /// <summary>
         /// The date a Pokémon was met as an egg.
@@ -257,18 +258,29 @@ namespace PKHeX
         // Derived
         public virtual int SpriteItem => HeldItem;
         public virtual bool IsShiny => TSV == PSV;
+        public virtual bool Locked { get { return false; } set { } }
         public int TrainerID7 => (int)((uint)(TID | (SID << 16)) % 1000000);
-        public bool Gen7 => Version >= 30 && Version <= 31;
-        public bool Gen6 => Version >= 24 && Version <= 29;
+        public bool VC2 => Version >= 39 && Version <= 41;
+        public bool VC1 => Version >= 35 && Version <= 38;
+        public bool Horohoro => Version == 34;
+        public bool E => Version == (int)GameVersion.E;
+        public bool FRLG => Version == (int)GameVersion.FR || Version == (int)GameVersion.LG;
+        public bool Pt => (int)GameVersion.Pt == Version;
+        public bool HGSS => Version == (int)GameVersion.HG || Version == (int)GameVersion.SS;
+        public bool B2W2 => Version == (int)GameVersion.B2 || Version == (int)GameVersion.W2;
         public bool XY => Version == (int)GameVersion.X || Version == (int)GameVersion.Y;
         public bool AO => Version == (int)GameVersion.AS || Version == (int)GameVersion.OR;
         public bool SM => Version == (int)GameVersion.SN || Version == (int)GameVersion.MN;
-        protected bool PtHGSS => GameVersion.Pt == (GameVersion)Version || HGSS;
-        public bool HGSS => new[] {GameVersion.HG, GameVersion.SS}.Contains((GameVersion)Version);
+        protected bool PtHGSS => Pt || HGSS;
+        public bool VC => VC1 || VC2;
+        public bool Gen7 => Version >= 30 && Version <= 33;
+        public bool Gen6 => Version >= 24 && Version <= 29;
         public bool Gen5 => Version >= 20 && Version <= 23;
         public bool Gen4 => Version >= 7 && Version <= 12 && Version != 9;
         public bool Gen3 => Version >= 1 && Version <= 5 || Version == 15;
-        public bool GenU => !(Gen6 || Gen5 || Gen4 || Gen3);
+        public bool Gen2 => Version == (int)GameVersion.GSC;
+        public bool Gen1 => Version == (int)GameVersion.RBY;
+        public bool GenU => !(Gen7 || Gen6 || Gen5 || Gen4 || Gen3 || Gen2 || Gen1 || VC);
         public int GenNumber
         {
             get
@@ -278,23 +290,34 @@ namespace PKHeX
                 if (Gen5) return 5;
                 if (Gen4) return 4;
                 if (Gen3) return 3;
+                if (Gen2) return Format; // 2
+                if (Gen1) return Format; // 1
+                if (VC) return 1;
                 return -1;
             } 
         }
         public bool PKRS_Infected => PKRS_Strain > 0;
         public bool PKRS_Cured => PKRS_Days == 0 && PKRS_Strain > 0;
         public virtual bool ChecksumValid => Checksum == CalculateChecksum();
-        public int CurrentLevel => PKX.getLevel(Species, EXP);
-        public bool MarkCircle      { get { return (MarkValue & (1 << 0)) == 1 << 0; } set { MarkValue = (byte)(MarkValue & ~(1 << 0) | (value ? 1 << 0 : 0)); } }
-        public bool MarkTriangle    { get { return (MarkValue & (1 << 1)) == 1 << 1; } set { MarkValue = (byte)(MarkValue & ~(1 << 0) | (value ? 1 << 0 : 0)); } }
-        public bool MarkSquare      { get { return (MarkValue & (1 << 2)) == 1 << 2; } set { MarkValue = (byte)(MarkValue & ~(1 << 0) | (value ? 1 << 0 : 0)); } }
-        public bool MarkHeart       { get { return (MarkValue & (1 << 3)) == 1 << 3; } set { MarkValue = (byte)(MarkValue & ~(1 << 0) | (value ? 1 << 0 : 0)); } }
-        public bool MarkStar        { get { return (MarkValue & (1 << 4)) == 1 << 4; } set { MarkValue = (byte)(MarkValue & ~(1 << 0) | (value ? 1 << 0 : 0)); } }
-        public bool MarkDiamond     { get { return (MarkValue & (1 << 5)) == 1 << 5; } set { MarkValue = (byte)(MarkValue & ~(1 << 0) | (value ? 1 << 0 : 0)); } }
-        public Image Sprite => PKX.getSprite(this);
+        public int CurrentLevel { get { return PKX.getLevel(Species, EXP); } set { EXP = PKX.getEXP(value, Species); } }
+        public int MarkCircle      { get { return Markings[0]; } set { var marks = Markings; marks[0] = value; Markings = marks; } }
+        public int MarkTriangle    { get { return Markings[1]; } set { var marks = Markings; marks[1] = value; Markings = marks; } }
+        public int MarkSquare      { get { return Markings[2]; } set { var marks = Markings; marks[2] = value; Markings = marks; } }
+        public int MarkHeart       { get { return Markings[3]; } set { var marks = Markings; marks[3] = value; Markings = marks; } }
+        public int MarkStar        { get { return Markings[4]; } set { var marks = Markings; marks[4] = value; Markings = marks; } }
+        public int MarkDiamond     { get { return Markings[5]; } set { var marks = Markings; marks[5] = value; Markings = marks; } }
         public string ShowdownText => ShowdownSet.getShowdownText(this);
-        public string[] QRText => PKX.getQRText(this);
-        public virtual string FileName => $"{Species.ToString("000")}{(IsShiny ? " ★" : "")} - {Nickname} - {Checksum.ToString("X4")}{EncryptionConstant.ToString("X8")}.{Extension}";
+        public string[] QRText => this.getQRText();
+
+        public virtual string FileName
+        {
+            get
+            {
+                string form = AltForm > 0 ? $"-{AltForm:00}" : "";
+                string star = IsShiny ? " ★" : "";
+                return $"{Species:000}{form}{star} - {Nickname} - {Checksum:X4}{EncryptionConstant:X8}.{Extension}";
+            }
+        }
         public int[] IVs
         {
             get { return new[] { IV_HP, IV_ATK, IV_DEF, IV_SPE, IV_SPA, IV_SPD }; }
@@ -337,9 +360,10 @@ namespace PKHeX
             {
                 if (GenNumber > 5 || Format > 5)
                     return -1;
-                if (GenNumber == 5)
-                    return (int)((PID >> 16) & 1);
-                return (int)(PID & 1);
+                
+                if (Version == (int) GameVersion.CXD)
+                    return Array.IndexOf(PersonalInfo.Abilities, Ability);
+                return (int)((GenNumber == 5 ? PID >> 16 : PID) & 1);
             }
         }
 
@@ -358,7 +382,7 @@ namespace PKHeX
                     return;
                 byte b = 0;
                 for (int i = 0; i < value.Length; i++)
-                    b |= (byte)((value[i] & 1) << i);
+                    b |= (byte)(Math.Min(value[i], 1) << i);
                 MarkValue = b;
             }
         }
@@ -368,9 +392,19 @@ namespace PKHeX
             get { return new[] { CNT_Cool, CNT_Beauty, CNT_Cute, CNT_Smart, CNT_Tough, CNT_Sheen }; }
             set { if (value?.Length != 6) return; CNT_Cool = value[0]; CNT_Beauty = value[1]; CNT_Cute = value[2]; CNT_Smart = value[3]; CNT_Tough = value[4]; CNT_Sheen = value[5]; }
         }
+
+        protected static int getHiddenPowerBitVal(int[] ivs)
+        {
+            int sum = 0;
+            for (int i = 0; i < ivs.Length; i++)
+                sum |= (ivs[i] & 1) << i;
+            return sum;
+        }
+        private int HPVal => getHiddenPowerBitVal(new[] {IV_HP, IV_ATK, IV_DEF, IV_SPE, IV_SPA, IV_SPD});
+        public virtual int HPPower => Format < 6 ? 40*HPVal/63 + 30 : 60;
         public virtual int HPType
         {
-            get { return 15 * ((IV_HP & 1) + 2 * (IV_ATK & 1) + 4 * (IV_DEF & 1) + 8 * (IV_SPE & 1) + 16 * (IV_SPA & 1) + 32 * (IV_SPD & 1)) / 63; }
+            get { return 15*HPVal/63; }
             set
             {
                 IV_HP = (IV_HP & ~1) + PKX.hpivs[value, 0];
@@ -384,13 +418,23 @@ namespace PKHeX
 
         // Legality Extensions
         public virtual bool WasLink => false;
-        public virtual bool WasEgg => Egg_Location > 0;
+        private bool _WasEgg;
+        public virtual bool WasEgg
+        {
+            get
+            {
+                return Egg_Location > 0 || _WasEgg;
+            }
+            set { _WasEgg = value; }
+        }
         public virtual bool WasEvent => Met_Location > 40000 && Met_Location < 50000 || FatefulEncounter;
         public virtual bool WasEventEgg => ((Egg_Location > 40000 && Egg_Location < 50000) || (FatefulEncounter && Egg_Location > 0)) && Met_Level == 1;
-        public virtual bool WasTradedEgg => Egg_Location == 30002;
-        public virtual bool WasIngameTrade => Met_Location == 30001;
-        public virtual bool IsUntraded => string.IsNullOrWhiteSpace(HT_Name) && GenNumber == Format;
+        public virtual bool WasTradedEgg => Egg_Location == 30002 || GenNumber == 4 && Egg_Location == 2002;
+        public virtual bool WasIngameTrade => Met_Location == 30001 || GenNumber == 4 && Egg_Location == 2001;
+        public virtual bool IsUntraded => Format >= 6 && string.IsNullOrWhiteSpace(HT_Name) && GenNumber == Format;
         public virtual bool IsNative => GenNumber == Format;
+        public virtual bool IsOriginValid => Species <= Legal.getMaxSpeciesOrigin(Format);
+
         public virtual bool SecretSuperTrainingUnlocked { get { return false; } set { } }
         public virtual bool SecretSuperTrainingComplete { get { return false; } set { } }
 
@@ -402,30 +446,101 @@ namespace PKHeX
         public virtual bool HT_SPD { get { return false; } set { } }
         public virtual bool HT_SPE { get { return false; } set { } }
 
-        public bool InhabitedGeneration(int Generation)
+        /// <summary>
+        /// Toggles the Hyper Training flag for a given stat.
+        /// </summary>
+        /// <param name="stat">Battle Stat (H/A/B/S/C/D)</param>
+        public void HyperTrainInvert(int stat)
         {
+            switch (stat)
+            {
+                case 0: HT_HP ^= true; break;
+                case 1: HT_ATK ^= true; break;
+                case 2: HT_DEF ^= true; break;
+                case 3: HT_SPA ^= true; break;
+                case 4: HT_SPD ^= true; break;
+                case 5: HT_SPE ^= true; break;
+            }
+        }
+
+        /// <summary>
+        /// Checks if the <see cref="PKM"/> could inhabit a set of games.
+        /// </summary>
+        /// <param name="Generation">Set of games.</param>
+        /// <param name="species"></param>
+        /// <returns>True if could inhabit, False if not.</returns>
+        public bool InhabitedGeneration(int Generation, int species = -1)
+        {
+            if (species < 0)
+                species = Species;
+
+            if (Format == Generation)
+                return true;
+
             if (Format < Generation)
                 return false; // Future
-            if (GenNumber > Generation)
-                return false; // Past
 
-            switch (Generation) // Sanity Check Species ID
+            if (!IsOriginValid)
+                return false;
+
+            // Sanity Check Species ID
+            if (Legal.getMaxSpeciesOrigin(GenNumber) < species && !Legal.getFutureGenEvolutions(GenNumber).Contains(species))
+                return false;
+
+            int gen = GenNumber;
+            switch (Generation)
             {
-                case 1: return Species <= Legal.MaxSpeciesID_1;
-                case 2: return Species <= Legal.MaxSpeciesID_2;
-                case 3: return Species <= Legal.MaxSpeciesID_3;
-                case 4: return Species <= Legal.MaxSpeciesID_4;
-                case 5: return Species <= Legal.MaxSpeciesID_5;
-                case 6: return Species <= Legal.MaxSpeciesID_6;
-                case 7: return Species <= Legal.MaxSpeciesID_7;
+                case 1:
+                case 2: return Format <= 2 || VC;
+                case 3: return Gen3;
+                case 4: return 3 <= gen && gen <= 4;
+                case 5: return 3 <= gen && gen <= 5;
+                case 6: return 3 <= gen && gen <= 6;
+                case 7: return VC || 3 <= gen && gen <= 7;
                 default:
                     return false;
             }
         }
 
-        // Methods
-        public abstract bool getGenderIsValid();
+        /// <summary>
+        /// Checks if the PKM has its original met location.
+        /// </summary>
+        /// <returns>Returns false if the Met Location has been overwritten via generational transfer.</returns>
+        public virtual bool HasOriginalMetLocation => !(Format < 3 || VC || GenNumber <= 4 && Format != GenNumber);
+
+        /// <summary>
+        /// Checks if the current <see cref="Gender"/> is valid.
+        /// </summary>
+        /// <returns>True if valid, False if invalid.</returns>
+        public virtual bool getGenderIsValid()
+        {
+            int gv = PersonalInfo.Gender;
+            if (gv == 255)
+                return Gender == 2;
+            if (gv == 254)
+                return Gender == 1;
+            if (gv == 0)
+                return Gender == 0;
+
+            if (GenNumber >= 6)
+                return true;
+
+            if ((PID & 0xFF) < gv)
+                return Gender == 1;
+            if (gv <= (PID & 0xFF))
+                return Gender == 0;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Updates the checksum of the <see cref="PKM"/>.
+        /// </summary>
         public void RefreshChecksum() { Checksum = CalculateChecksum(); }
+
+        /// <summary>
+        /// Reorders moves and fixes PP if necessary.
+        /// </summary>
         public void FixMoves()
         {
             ReorderMoves();
@@ -436,6 +551,9 @@ namespace PKHeX
             if (Move4 == 0) { Move4_PP = 0; Move4_PPUps = 0; }
         }
 
+        /// <summary>
+        /// Reorders moves to put Empty entries last.
+        /// </summary>
         private void ReorderMoves()
         {
             if (Move4 != 0 && Move3 == 0)
@@ -463,6 +581,22 @@ namespace PKHeX
             }
         }
 
+        /// <summary>
+        /// Applies the desired Ability option.
+        /// </summary>
+        /// <param name="n">Ability Number (0/1/2)</param>
+        public void RefreshAbility(int n)
+        {
+            AbilityNumber = 1 << n;
+            int[] abilities = PersonalInfo.Abilities;
+            if (n < abilities.Length)
+                Ability = abilities[n];
+        }
+
+        /// <summary>
+        /// Gets the IV Judge Rating value.
+        /// </summary>
+        /// <remarks>IV Judge scales his response 0 (worst) to 3 (best).</remarks>
         public int PotentialRating
         {
             get
@@ -476,11 +610,16 @@ namespace PKHeX
             }
         }
 
+        /// <summary>
+        /// Gets the current Battle Stats.
+        /// </summary>
+        /// <param name="p"><see cref="PersonalInfo"/> entry containing Base Stat Info</param>
+        /// <returns>Battle Stats (H/A/B/S/C/D)</returns>
         public virtual ushort[] getStats(PersonalInfo p)
         {
             int level = CurrentLevel;
             ushort[] Stats = new ushort[6];
-            Stats[0] = (ushort)(p.HP == 1 ? 1 : (((HT_HP ? 31 : IV_HP) + 2 * p.HP + EV_HP / 4 + 100) * level / 100 + 10));
+            Stats[0] = (ushort)(p.HP == 1 ? 1 : ((HT_HP ? 31 : IV_HP) + 2 * p.HP + EV_HP / 4 + 100) * level / 100 + 10);
             Stats[1] = (ushort)(((HT_ATK ? 31 : IV_ATK) + 2 * p.ATK + EV_ATK / 4) * level / 100 + 5);
             Stats[2] = (ushort)(((HT_DEF ? 31 : IV_DEF) + 2 * p.DEF + EV_DEF / 4) * level / 100 + 5);
             Stats[4] = (ushort)(((HT_SPA ? 31 : IV_SPA) + 2 * p.SPA + EV_SPA / 4) * level / 100 + 5);
@@ -495,6 +634,10 @@ namespace PKHeX
             Stats[decr] *= 9; Stats[decr] /= 10;
             return Stats;
         }
+        /// <summary>
+        /// Applies the specified stats to the <see cref="PKM"/>.
+        /// </summary>
+        /// <param name="Stats">Battle Stats (H/A/B/S/C/D)</param>
         public void setStats(ushort[] Stats)
         {
             Stat_HPMax = Stat_HPCurrent = Stats[0];
@@ -504,18 +647,39 @@ namespace PKHeX
             Stat_SPA = Stats[4];
             Stat_SPD = Stats[5];
         }
+
+        /// <summary>
+        /// Checks if the <see cref="PKM"/> can hold its <see cref="HeldItem"/>.
+        /// </summary>
+        /// <param name="ValidArray">Items that the <see cref="PKM"/> can hold.</param>
+        /// <returns>True/False if the <see cref="PKM"/> can hold its <see cref="HeldItem"/>.</returns>
         public virtual bool CanHoldItem(ushort[] ValidArray)
         {
             return ValidArray.Contains((ushort)HeldItem);
         }
 
+        /// <summary>
+        /// Deep clones the <see cref="PKM"/> object. The clone will not have any shared resources with the source.
+        /// </summary>
+        /// <returns>Cloned <see cref="PKM"/> object</returns>
         public abstract PKM Clone();
 
+        /// <summary>
+        /// Gets the PP of a Move ID with consideration of the amount of PP Ups applied.
+        /// </summary>
+        /// <param name="move">Move ID</param>
+        /// <param name="ppup">PP Ups count</param>
+        /// <returns>Current PP for the move.</returns>
         public int getMovePP(int move, int ppup)
         {
             return getBasePP(move) * (5 + ppup) / 5;
         }
 
+        /// <summary>
+        /// Gets the base PP of a move ID depending on the <see cref="PKM"/>'s format.
+        /// </summary>
+        /// <param name="move">Move ID</param>
+        /// <returns>Amount of PP the move has by default (no PP Ups).</returns>
         private int getBasePP(int move)
         {
             int[] pptable;
@@ -535,30 +699,58 @@ namespace PKHeX
             return pptable[move];
         }
 
+        /// <summary>
+        /// Applies a shiny PID to the <see cref="PKM"/>.
+        /// </summary>
+        /// <remarks>
+        /// If a <see cref="PKM"/> originated in a generation prior to Generation 6, the <see cref="EncryptionConstant"/> is updated.
+        /// </remarks>
         public void setShinyPID()
         {
             do PID = PKX.getRandomPID(Species, Gender, Version, Nature, AltForm, PID); while (!IsShiny);
             if (GenNumber < 6)
                 EncryptionConstant = PID;
         }
+        /// <summary>
+        /// Applies a PID to the <see cref="PKM"/> according to the specified <see cref="Gender"/>.
+        /// </summary>
+        /// <remarks>
+        /// If a <see cref="PKM"/> originated in a generation prior to Generation 6, the <see cref="EncryptionConstant"/> is updated.
+        /// </remarks>
         public void setPIDGender(int gender)
         {
             do PID = PKX.getRandomPID(Species, gender, Version, Nature, AltForm, PID); while (IsShiny);
             if (GenNumber < 6)
                 EncryptionConstant = PID;
         }
+        /// <summary>
+        /// Applies a PID to the <see cref="PKM"/> according to the specified <see cref="Gender"/>.
+        /// </summary>
+        /// <remarks>
+        /// If a <see cref="PKM"/> originated in a generation prior to Generation 6, the <see cref="EncryptionConstant"/> is updated.
+        /// </remarks>
         public void setPIDNature(int nature)
         {
             do PID = PKX.getRandomPID(Species, Gender, Version, nature, AltForm, PID); while (IsShiny);
             if (GenNumber < 6)
                 EncryptionConstant = PID;
         }
+        /// <summary>
+        /// Applies a PID to the <see cref="PKM"/> according to the specified <see cref="AltForm"/>.
+        /// </summary>
+        /// <remarks>
+        /// This method should only be used for Unown originating in Generation 3 games.
+        /// If a <see cref="PKM"/> originated in a generation prior to Generation 6, the <see cref="EncryptionConstant"/> is updated.
+        /// </remarks>
         public void setPIDUnown3(int form)
         {
             do PID = Util.rnd32(); while (PKX.getUnownForm(PID) != form);
         }
-
-        // Gen3 Conversion -- do not use if format > 4
+        
+        /// <summary>
+        /// Converts a <see cref="XK3"/> or <see cref="PK3"/> to <see cref="CK3"/>.
+        /// </summary>
+        /// <returns><see cref="CK3"/> format <see cref="PKM"/></returns>
         public PKM convertToCK3()
         {
             if (Format != 3)
@@ -570,6 +762,10 @@ namespace PKHeX
             pk.setStats(getStats(PersonalTable.RS[pk.Species]));
             return pk;
         }
+        /// <summary>
+        /// Converts a <see cref="PK3"/> or <see cref="CK3"/> to <see cref="XK3"/>.
+        /// </summary>
+        /// <returns><see cref="XK3"/> format <see cref="PKM"/></returns>
         public PKM convertToXK3()
         {
             if (Format != 3)
@@ -581,6 +777,10 @@ namespace PKHeX
             pk.setStats(getStats(PersonalTable.RS[pk.Species]));
             return pk;
         }
+        /// <summary>
+        /// Converts a <see cref="CK3"/> or <see cref="XK3"/> to <see cref="PK3"/>.
+        /// </summary>
+        /// <returns><see cref="PK3"/> format <see cref="PKM"/></returns>
         public PKM convertToPK3()
         {
             if (Format != 3)
@@ -593,37 +793,21 @@ namespace PKHeX
             return pk;
         }
 
-        public PKM convertPK1toPK7()
-        {
-            if (Format != 1)
-                return null;
-            if (Species > 151)
-                return null;
-
-            var pk = new PK7();
-            TransferPropertiesWithReflection(this, pk);
-            pk.EVs = new int[6];
-            pk.Nature = IVs.Sum() % 25;
-            pk.IVs = new[] {31,31,31,31,31,31};
-            pk.RefreshChecksum();
-            if (!IsNicknamed)
-                pk.Nickname = Nickname.ToLower();
-            pk.Version = -1;
-            pk.Ability = PersonalTable.SM[Species].Abilities[0];
-            do PID = PKX.getRandomPID(Species, Gender, Version, Nature, AltForm, PID); while (!IsShiny);
-            return pk;
-        }
+        /// <summary>
+        /// Applies all shared properties from <see cref="Source"/> to <see cref="Destination"/>.
+        /// </summary>
+        /// <param name="Source"><see cref="PKM"/> that supplies property values.</param>
+        /// <param name="Destination"><see cref="PKM"/> that receives property values.</param>
         protected void TransferPropertiesWithReflection(PKM Source, PKM Destination)
         {
-            var SourceProperties = ReflectUtil.getPropertiesCanWritePublic(Source.GetType());
-            var DestinationProperties = ReflectUtil.getPropertiesCanWritePublic(Destination.GetType());
-
-            foreach (string property in SourceProperties.Intersect(DestinationProperties).Where(prop => prop != nameof(Data)))
+            // Only transfer declared properties not defined in PKM.cs but in the actual type
+            var SourceProperties = ReflectUtil.getPropertiesCanWritePublicDeclared(Source.GetType());
+            var DestinationProperties = ReflectUtil.getPropertiesCanWritePublicDeclared(Destination.GetType());
+            foreach (string property in SourceProperties.Intersect(DestinationProperties))
             {
                 var prop = ReflectUtil.GetValue(this, property);
-                if (prop == null)
-                    continue;
-                ReflectUtil.SetValue(Destination, property, prop);
+                if (prop != null)
+                    ReflectUtil.SetValue(Destination, property, prop);
             }
         }
     }

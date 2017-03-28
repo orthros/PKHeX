@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class BK4 : PKM // Big Endian 4th Generation PKM File
     {
-        internal static readonly byte[] ExtraBytes =
+        public static readonly byte[] ExtraBytes =
         {
             0x42, 0x43, 0x5E, 0x63, 0x64, 0x65, 0x66, 0x67, 0x87
         };
@@ -264,12 +264,12 @@ namespace PKHeX
                 PKX.str2arrayG4BE(TempNick).CopyTo(Data, 0x68);
             }
         }
-        protected override int Egg_Year { get { return Data[0x78]; } set { Data[0x78] = (byte)value; } }
-        protected override int Egg_Month { get { return Data[0x79]; } set { Data[0x79] = (byte)value; } }
-        protected override int Egg_Day { get { return Data[0x7A]; } set { Data[0x7A] = (byte)value; } }
-        protected override int Met_Year { get { return Data[0x7B]; } set { Data[0x7B] = (byte)value; } }
-        protected override int Met_Month { get { return Data[0x7C]; } set { Data[0x7C] = (byte)value; } }
-        protected override int Met_Day { get { return Data[0x7D]; } set { Data[0x7D] = (byte)value; } }
+        public override int Egg_Year { get { return Data[0x78]; } set { Data[0x78] = (byte)value; } }
+        public override int Egg_Month { get { return Data[0x79]; } set { Data[0x79] = (byte)value; } }
+        public override int Egg_Day { get { return Data[0x7A]; } set { Data[0x7A] = (byte)value; } }
+        public override int Met_Year { get { return Data[0x7B]; } set { Data[0x7B] = (byte)value; } }
+        public override int Met_Month { get { return Data[0x7C]; } set { Data[0x7C] = (byte)value; } }
+        public override int Met_Day { get { return Data[0x7D]; } set { Data[0x7D] = (byte)value; } }
 
         public override int Egg_Location
         {
@@ -403,24 +403,6 @@ namespace PKHeX
         }
         
         // Methods
-        public override bool getGenderIsValid()
-        {
-            int gv = PersonalTable.HGSS[Species].Gender;
-
-            if (gv == 255)
-                return Gender == 2;
-            if (gv == 254)
-                return Gender == 0;
-            if (gv == 0)
-                return Gender == 1;
-            if (gv <= (PID & 0xFF))
-                return Gender == 0;
-            if ((PID & 0xFF) < gv)
-                return Gender == 1;
-
-            return false;
-        }
-
         protected override ushort CalculateChecksum()
         {
             ushort chk = 0;

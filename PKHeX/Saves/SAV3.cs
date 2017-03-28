@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public sealed class SAV3 : SaveFile
     {
@@ -52,7 +52,7 @@ namespace PKHeX
                 BlockOrder1[i] = BitConverter.ToInt16(Data, i*0x1000 + 0xFF4);
             int zeroBlock1 = Array.IndexOf(BlockOrder1, 0);
 
-            if (data.Length > SaveUtil.SIZE_G3RAWHALF)
+            if (Data.Length > SaveUtil.SIZE_G3RAWHALF)
             {
                 int[] BlockOrder2 = new int[14];
                 for (int i = 0; i < 14; i++)
@@ -97,30 +97,36 @@ namespace PKHeX
             {
                 case GameVersion.RS:
                     LegalKeyItems = Legal.Pouch_Key_RS;
+                    OFS_PCItem = BlockOfs[1] + 0x0498;
                     OFS_PouchHeldItem = BlockOfs[1] + 0x0560;
                     OFS_PouchKeyItem = BlockOfs[1] + 0x05B0;
                     OFS_PouchBalls = BlockOfs[1] + 0x0600;
                     OFS_PouchTMHM = BlockOfs[1] + 0x0640;
                     OFS_PouchBerry = BlockOfs[1] + 0x0740;
                     Personal = PersonalTable.RS;
-                    break;
-                case GameVersion.FRLG:
-                    LegalKeyItems = Legal.Pouch_Key_FRLG;
-                    OFS_PouchHeldItem = BlockOfs[1] + 0x0310;
-                    OFS_PouchKeyItem = BlockOfs[1] + 0x03B8;
-                    OFS_PouchBalls = BlockOfs[1] + 0x0430;
-                    OFS_PouchTMHM = BlockOfs[1] + 0x0464;
-                    OFS_PouchBerry = BlockOfs[1] + 0x054C;
-                    Personal = PersonalTable.FR;
+                    SeenFlagOffsets = new[] {BlockOfs[0] + 0x5C, BlockOfs[1] + 0x938, BlockOfs[4] + 0xC0C};
                     break;
                 case GameVersion.E:
                     LegalKeyItems = Legal.Pouch_Key_E;
+                    OFS_PCItem = BlockOfs[1] + 0x0498;
                     OFS_PouchHeldItem = BlockOfs[1] + 0x0560;
                     OFS_PouchKeyItem = BlockOfs[1] + 0x05D8;
                     OFS_PouchBalls = BlockOfs[1] + 0x0650;
                     OFS_PouchTMHM = BlockOfs[1] + 0x0690;
                     OFS_PouchBerry = BlockOfs[1] + 0x0790;
                     Personal = PersonalTable.E;
+                    SeenFlagOffsets = new[] {BlockOfs[0] + 0x5C, BlockOfs[1] + 0x988, BlockOfs[4] + 0xCA4};
+                    break;
+                case GameVersion.FRLG:
+                    LegalKeyItems = Legal.Pouch_Key_FRLG;
+                    OFS_PCItem = BlockOfs[1] + 0x0298;
+                    OFS_PouchHeldItem = BlockOfs[1] + 0x0310;
+                    OFS_PouchKeyItem = BlockOfs[1] + 0x03B8;
+                    OFS_PouchBalls = BlockOfs[1] + 0x0430;
+                    OFS_PouchTMHM = BlockOfs[1] + 0x0464;
+                    OFS_PouchBerry = BlockOfs[1] + 0x054C;
+                    Personal = PersonalTable.FR;
+                    SeenFlagOffsets = new[] {BlockOfs[0] + 0x5C, BlockOfs[1] + 0x5F8, BlockOfs[4] + 0xB98};
                     break;
             }
             LegalItems = Legal.Pouch_Items_RS;
@@ -154,6 +160,7 @@ namespace PKHeX
         private int ABO => ActiveSAV*0xE000;
         private readonly int[] BlockOrder;
         private readonly int[] BlockOfs;
+        public int getBlockOffset(int block) => BlockOfs[block];
 
         // Configuration
         public override SaveFile Clone() { return new SAV3(Write(DSV:false), Version); }
@@ -166,11 +173,11 @@ namespace PKHeX
         public override PKM BlankPKM => new PK3();
         public override Type PKMType => typeof(PK3);
 
-        public override int MaxMoveID => 354;
+        public override int MaxMoveID => Legal.MaxMoveID_3;
         public override int MaxSpeciesID => Legal.MaxSpeciesID_3;
-        public override int MaxAbilityID => 77;
-        public override int MaxItemID => 374;
-        public override int MaxBallID => 0xC;
+        public override int MaxAbilityID => Legal.MaxAbilityID_3;
+        public override int MaxItemID => Legal.MaxItemID_3;
+        public override int MaxBallID => Legal.MaxBallID_3;
         public override int MaxGameID => 5;
 
         public override int BoxCount => 14;
@@ -218,7 +225,7 @@ namespace PKHeX
                     ushort chk = SaveUtil.check32(chunk);
                     ushort old = BitConverter.ToUInt16(Data, ABO + i*0x1000 + 0xFF6);
                     if (chk != old)
-                        r += $"Block {BlockOrder[i].ToString("00")} @ {(i*0x1000).ToString("X5")} invalid." + Environment.NewLine;
+                        r += $"Block {BlockOrder[i]:00} @ {i*0x1000:X5} invalid." + Environment.NewLine;
                 }
                 return r.Length == 0 ? "Checksums valid." : r.TrimEnd();
             }
@@ -324,25 +331,32 @@ namespace PKHeX
                 switch (Version)
                 {
                     case GameVersion.RS:
-                    case GameVersion.E: return BitConverter.ToUInt32(Data, BlockOfs[1] + 0x0494) ^ SecurityKey;
-                    case GameVersion.FRLG: return BitConverter.ToUInt32(Data, BlockOfs[1] + 0x0294) ^ SecurityKey;
+                    case GameVersion.E: return (ushort)(BitConverter.ToUInt16(Data, BlockOfs[1] + 0x0494) ^ SecurityKey);
+                    case GameVersion.FRLG: return (ushort)(BitConverter.ToUInt16(Data, BlockOfs[1] + 0x0294) ^ SecurityKey);
                     default: return 0;
                 }
             }
             set
             {
+                if (value > 9999)
+                    value = 9999;
                 switch (Version)
                 {
                     case GameVersion.RS:
-                    case GameVersion.E: BitConverter.GetBytes(value ^ SecurityKey).CopyTo(Data, BlockOfs[1] + 0x0494); break;
-                    case GameVersion.FRLG: BitConverter.GetBytes(value ^ SecurityKey).CopyTo(Data, BlockOfs[1] + 0x0294); break;
+                    case GameVersion.E: BitConverter.GetBytes((ushort)(value ^ SecurityKey)).CopyTo(Data, BlockOfs[1] + 0x0494); break;
+                    case GameVersion.FRLG: BitConverter.GetBytes((ushort)(value ^ SecurityKey)).CopyTo(Data, BlockOfs[1] + 0x0294); break;
                 }
             }
         }
-        public int BP
+        public uint BP
         {
-            get { return Data[BlockOfs[0] + 0xEB8]; }
-            set { Data[BlockOfs[0] + 0xEB8] = (byte)value; }
+            get { return BitConverter.ToUInt16(Data, BlockOfs[0] + 0xEB8); }
+            set
+            {
+                if (value > 9999)
+                    value = 9999;
+                BitConverter.GetBytes((ushort)value).CopyTo(Data, BlockOfs[0] + 0xEB8);
+            }
         }
 
         private readonly ushort[] LegalItems, LegalKeyItems, LegalBalls, LegalTMHMs, LegalBerries;
@@ -350,17 +364,21 @@ namespace PKHeX
         {
             get
             {
+                int max = Version == GameVersion.FRLG ? 995 : 95;
+                var PCItems = new [] {LegalItems, LegalKeyItems, LegalKeyItems, LegalBalls, LegalTMHMs, LegalBerries}.SelectMany(a => a).ToArray();
                 InventoryPouch[] pouch =
                 {
-                    new InventoryPouch(InventoryType.Items, LegalItems, 95, OFS_PouchHeldItem, (OFS_PouchKeyItem - OFS_PouchHeldItem)/4),
+                    new InventoryPouch(InventoryType.Items, LegalItems, max, OFS_PouchHeldItem, (OFS_PouchKeyItem - OFS_PouchHeldItem)/4),
                     new InventoryPouch(InventoryType.KeyItems, LegalKeyItems, 1, OFS_PouchKeyItem, (OFS_PouchBalls - OFS_PouchKeyItem)/4),
-                    new InventoryPouch(InventoryType.Balls, LegalBalls, 95, OFS_PouchBalls, (OFS_PouchTMHM - OFS_PouchBalls)/4),
-                    new InventoryPouch(InventoryType.TMHMs, LegalTMHMs, 95, OFS_PouchTMHM, (OFS_PouchBerry - OFS_PouchTMHM)/4),
-                    new InventoryPouch(InventoryType.Berries, LegalBerries, 95, OFS_PouchBerry, Version == GameVersion.FRLG ? 43 : 46),
+                    new InventoryPouch(InventoryType.Balls, LegalBalls, max, OFS_PouchBalls, (OFS_PouchTMHM - OFS_PouchBalls)/4),
+                    new InventoryPouch(InventoryType.TMHMs, LegalTMHMs, max, OFS_PouchTMHM, (OFS_PouchBerry - OFS_PouchTMHM)/4),
+                    new InventoryPouch(InventoryType.Berries, LegalBerries, max, OFS_PouchBerry, Version == GameVersion.FRLG ? 43 : 46),
+                    new InventoryPouch(InventoryType.PCItems, PCItems, max, OFS_PCItem, (OFS_PouchHeldItem - OFS_PCItem)/4),
                 };
                 foreach (var p in pouch)
                 {
-                    p.SecurityKey = SecurityKey;
+                    if (p.Type != InventoryType.PCItems)
+                        p.SecurityKey = SecurityKey;
                     p.getPouch(ref Data);
                 }
                 return pouch;
@@ -457,42 +475,78 @@ namespace PKHeX
             return PKX.decryptArray3(data);
         }
 
+        // Pokédex
+        private readonly int[] SeenFlagOffsets;
+        public override bool HasPokeDex => true;
         protected override void setDex(PKM pkm)
         {
-            if (pkm.Species == 0)
-                return;
-            if (pkm.Species > MaxSpeciesID)
-                return;
-            if (Version == GameVersion.Unknown)
-                return;
-            if (BlockOfs.Any(z => z < 0))
+            int species = pkm.Species;
+            if (!canSetDex(species))
                 return;
             
-            int bit = pkm.Species - 1;
-            int ofs = bit/8;
-            byte bitval = (byte)(1 << (bit%8));
+            setCaught(pkm.Species, true);
+            setSeen(pkm.Species, true);
+        }
+        private bool canSetDex(int species)
+        {
+            if (species <= 0)
+                return false;
+            if (species > MaxSpeciesID)
+                return false;
+            if (Version == GameVersion.Unknown)
+                return false;
+            if (BlockOfs.Any(z => z < 0))
+                return false;
+            return true;
+        }
 
-            // Set the Captured Flag
-            Data[BlockOfs[0] + 0x28 + ofs] |= bitval;
+        public override bool getCaught(int species)
+        {
+            int bit = species - 1;
+            int ofs = bit >> 3;
+            byte bitval = (byte) (1 << (bit&7));
 
-            // Set the Seen Flag
-            Data[BlockOfs[0] + 0x5C + ofs] |= bitval;
+            int caughtOffset = BlockOfs[0] + 0x28 + ofs;
 
-            // Set the two other Seen flags (mirrored)
-            switch (Version)
+            return (Data[caughtOffset] & bitval) != 0;
+        }
+        public override void setCaught(int species, bool caught)
+        {
+            int bit = species - 1;
+            int ofs = bit / 8;
+            int bitval = 1 << (bit&7);
+            int caughtOffset = BlockOfs[0] + 0x28 + ofs;
+
+            if (caught)
+                Data[caughtOffset] |= (byte)bitval;
+            else
+                Data[caughtOffset] &= (byte)~bitval;
+        }
+
+        public override bool getSeen(int species)
+        {
+            int bit = species - 1;
+            int ofs = bit >> 3;
+            byte bitval = (byte)(1 << (bit&7));
+
+            int seenOffset = BlockOfs[0] + 0x5C + ofs;
+            return (Data[seenOffset] & bitval) != 0;
+        }
+        public override void setSeen(int species, bool seen)
+        {
+            int bit = species - 1;
+            int ofs = bit / 8;
+            int bitval = 1 << (bit&7);
+
+            if (seen)
             {
-                case GameVersion.RS:
-                    Data[BlockOfs[1] + 0x938 + ofs] |= bitval;
-                    Data[BlockOfs[4] + 0xC0C + ofs] |= bitval;
-                    break;
-                case GameVersion.E:
-                    Data[BlockOfs[1] + 0x988 + ofs] |= bitval;
-                    Data[BlockOfs[4] + 0xCA4 + ofs] |= bitval;
-                    break;
-                case GameVersion.FRLG:
-                    Data[BlockOfs[1] + 0x5F8 + ofs] |= bitval;
-                    Data[BlockOfs[4] + 0xB98 + ofs] |= bitval;
-                    break;
+                for (int i = 0; i < 3; i++)
+                    Data[SeenFlagOffsets[i] + ofs] |= (byte)bitval;
+            }
+            else
+            {
+                for (int i = 0; i < 3; i++)
+                    Data[SeenFlagOffsets[i] + ofs] &= (byte) ~bitval;
             }
         }
 

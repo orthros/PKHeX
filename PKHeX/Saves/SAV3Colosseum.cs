@@ -2,9 +2,9 @@
 using System.Linq;
 using System.Security.Cryptography;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
-    public sealed class SAV3Colosseum : SaveFile
+    public sealed class SAV3Colosseum : SaveFile, IDisposable
     {
         public override string BAKName => $"{FileName} [{OT} ({Version}) - {PlayTimeString}].bak";
         public override string Filter => "GameCube Save File|*.gci|All Files|*.*";
@@ -25,7 +25,7 @@ namespace PKHeX
         private readonly int SaveCount = -1;
         private readonly int SaveIndex = -1;
         private readonly StrategyMemo StrategyMemo;
-        public override int MaxShadowID => 0x30; // 48
+        public override int MaxShadowID => 0x80; // 128
         private readonly int Memo;
         private readonly ushort[] LegalItems, LegalKeyItems, LegalBalls, LegalTMHMs, LegalBerries, LegalCologne;
         private readonly int OFS_PouchCologne;
@@ -115,7 +115,12 @@ namespace PKHeX
         }
 
         // Configuration
-        public override SaveFile Clone() { return new SAV3Colosseum(Write(DSV: false)); }
+        public override SaveFile Clone()
+        {
+            byte[] data = Write(DSV: false).Skip(Header.Length).ToArray();
+            var sav = new SAV3Colosseum(data) { Header = (byte[])Header.Clone() };
+            return sav;
+        }
 
         public override int SIZE_STORED => PKX.SIZE_3CSTORED;
         public override int SIZE_PARTY => PKX.SIZE_3CSTORED; // unused
@@ -140,6 +145,7 @@ namespace PKHeX
 
         // Checksums
         private readonly SHA1 sha1 = SHA1.Create();
+        public void Dispose() => sha1.Dispose();
         private byte[] EncryptColosseum(byte[] input, byte[] digest)
         {
             if (input.Length != SLOT_SIZE)
@@ -274,6 +280,17 @@ namespace PKHeX
             return data;
         }
 
+        protected override void setPKM(PKM pkm)
+        {
+            var pk = pkm as CK3;
+            if (pk == null)
+                return;
+
+            if (pk.CurrentRegion == 0)
+                pk.CurrentRegion = 2; // NTSC-U
+            if (pk.OriginalRegion == 0)
+                pk.OriginalRegion = 2; // NTSC-U
+        }
         protected override void setDex(PKM pkm)
         {
             // Dex Related

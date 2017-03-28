@@ -1,17 +1,23 @@
 ﻿using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public static partial class Legal
     {
         internal const int MaxSpeciesID_6 = 721;
-
-        // PKHeX Valid Array Storage
+        internal const int MaxMoveID_6_XY = 617;
+        internal const int MaxMoveID_6_AO = 621;
+        internal const int MaxItemID_6_XY = 717;
+        internal const int MaxItemID_6_AO = 775;
+        internal const int MaxAbilityID_6_XY = 188;
+        internal const int MaxAbilityID_6_AO = 191;
+        internal const int MaxBallID_6 = 0x19;
+        internal const int MaxGameID_6 = 27; // OR
 
         #region Met Locations
         internal static readonly int[] Met_XYc = {0, 60002, 30002,};
 
-        internal static readonly int[] Met_XY_0 =
+        public static readonly int[] Met_XY_0 =
         {
    /* XY */ 2, 6, 8, 10, 12, 14, 16, 17, 18, 20, 22, 24, 26, 28, 30, 32,
             34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 82, 84, 86, 88,
@@ -161,7 +167,7 @@ namespace PKHeX
             065, 066, 067
         };
 
-        internal static readonly ushort[] Pouch_Berry_XY =
+        public static readonly ushort[] Pouch_Berry_XY =
         {
                  149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
             163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177,
@@ -208,7 +214,7 @@ namespace PKHeX
             15, 19, 57, 70, 127,
         };
 
-        internal static readonly int[] TypeTutor = {338, 307, 308, 520, 519, 518, 434, 620};
+        internal static readonly int[] TypeTutor6 = {520, 519, 518, 338, 307, 308, 434, 620};
 
         internal static readonly int[][] Tutors_AO =
         {
@@ -219,17 +225,7 @@ namespace PKHeX
         };
 
         #endregion
-
-        // Legality
-        internal const int Struggle = 165;
-        internal const int Chatter = 448;
-        internal static readonly int[] InvalidSketch =
-        {
-            // Regular Moves
-            Struggle, Chatter
-            // Z-Moves
-            // TODO
-        };
+        
         internal static readonly int[] EggLocations = {60002, 30002};
         internal static readonly int[] ValidMet_XY =
         {
@@ -369,13 +365,25 @@ namespace PKHeX
         #region Static Encounter/Gift Tables
         private static readonly EncounterStatic[] Encounter_XY =
         {
-            new EncounterStatic { Species = 650, Level = 5, Location = 10, Gift = true }, // Chespin
-            new EncounterStatic { Species = 653, Level = 5, Location = 10, Gift = true }, // Fennekin
-            new EncounterStatic { Species = 656, Level = 5, Location = 10, Gift = true }, // Froakie
+            new EncounterStatic { Gift = true, Species = 650, Level = 5, Location = 10, }, // Chespin
+            new EncounterStatic { Gift = true, Species = 653, Level = 5, Location = 10, }, // Fennekin
+            new EncounterStatic { Gift = true, Species = 656, Level = 5, Location = 10, }, // Froakie
 
-            new EncounterStatic { Species = 1, Level = 10, Location = 22, Gift = true }, // Bulbasaur
-            new EncounterStatic { Species = 4, Level = 10, Location = 22, Gift = true }, // Charmander
-            new EncounterStatic { Species = 7, Level = 10, Location = 22, Gift = true }, // Squirtle
+            new EncounterStatic { Gift = true, Species = 1, Level = 10, Location = 22, }, // Bulbasaur
+            new EncounterStatic { Gift = true, Species = 4, Level = 10, Location = 22, }, // Charmander
+            new EncounterStatic { Gift = true, Species = 7, Level = 10, Location = 22, }, // Squirtle
+
+            new EncounterStatic { Gift = true, Species = 138, Level = 20, Location = 44, }, // Omanyte
+            new EncounterStatic { Gift = true, Species = 140, Level = 20, Location = 44, }, // Kabuto
+            new EncounterStatic { Gift = true, Species = 142, Level = 20, Location = 44, }, // Aerodactyl
+            new EncounterStatic { Gift = true, Species = 345, Level = 20, Location = 44, }, // Lileep
+            new EncounterStatic { Gift = true, Species = 347, Level = 20, Location = 44, }, // Anorith
+            new EncounterStatic { Gift = true, Species = 408, Level = 20, Location = 44, }, // Cranidos
+            new EncounterStatic { Gift = true, Species = 410, Level = 20, Location = 44, }, // Shieldon
+            new EncounterStatic { Gift = true, Species = 564, Level = 20, Location = 44, }, // Tirtouga
+            new EncounterStatic { Gift = true, Species = 566, Level = 20, Location = 44, }, // Archen
+            new EncounterStatic { Gift = true, Species = 696, Level = 20, Location = 44, }, // Tyrunt
+            new EncounterStatic { Gift = true, Species = 698, Level = 20, Location = 44, }, // Amaura
 
             new EncounterStatic { Species = 448, Level = 32, Location = 60, Ability = 1, Nature = Nature.Hasty, Gender = 0, IVs = new[] {6, 25, 16, 31, 25, 19}, Gift = true, Shiny = false }, // Lucario
             new EncounterStatic { Species = 131, Level = 30, Location = 62, Nature = Nature.Docile, IVs = new[] {31, 20, 20, 20, 20, 20}, Gift = true }, // Lapras
@@ -410,26 +418,39 @@ namespace PKHeX
         };
         private static readonly EncounterStatic[] Encounter_AO =
         {
-            new EncounterStatic { Species = 252, Level = 5, Location = 204, Gift = true }, // Treeko
-            new EncounterStatic { Species = 255, Level = 5, Location = 204, Gift = true }, // Torchic
-            new EncounterStatic { Species = 258, Level = 5, Location = 204, Gift = true }, // Mudkip
+            new EncounterStatic { Gift = true, Species = 252, Level = 5, Location = 204, }, // Treeko
+            new EncounterStatic { Gift = true, Species = 255, Level = 5, Location = 204, }, // Torchic
+            new EncounterStatic { Gift = true, Species = 258, Level = 5, Location = 204, }, // Mudkip
             
-            new EncounterStatic { Species = 152, Level = 5, Location = 204, Gift = true }, // Chikorita
-            new EncounterStatic { Species = 155, Level = 5, Location = 204, Gift = true }, // Cyndaquil
-            new EncounterStatic { Species = 158, Level = 5, Location = 204, Gift = true }, // Totodile
+            new EncounterStatic { Gift = true, Species = 152, Level = 5, Location = 204, }, // Chikorita
+            new EncounterStatic { Gift = true, Species = 155, Level = 5, Location = 204, }, // Cyndaquil
+            new EncounterStatic { Gift = true, Species = 158, Level = 5, Location = 204, }, // Totodile
 
-            new EncounterStatic { Species = 387, Level = 5, Location = 204, Gift = true }, // Turtwig
-            new EncounterStatic { Species = 390, Level = 5, Location = 204, Gift = true }, // Chimchar
-            new EncounterStatic { Species = 393, Level = 5, Location = 204, Gift = true }, // Piplup
+            new EncounterStatic { Gift = true, Species = 387, Level = 5, Location = 204, }, // Turtwig
+            new EncounterStatic { Gift = true, Species = 390, Level = 5, Location = 204, }, // Chimchar
+            new EncounterStatic { Gift = true, Species = 393, Level = 5, Location = 204, }, // Piplup
 
-            new EncounterStatic { Species = 495, Level = 5, Location = 204, Gift = true }, // Snivy
-            new EncounterStatic { Species = 498, Level = 5, Location = 204, Gift = true }, // Tepig
-            new EncounterStatic { Species = 501, Level = 5, Location = 204, Gift = true }, // Oshawott
+            new EncounterStatic { Gift = true, Species = 495, Level = 5, Location = 204, }, // Snivy
+            new EncounterStatic { Gift = true, Species = 498, Level = 5, Location = 204, }, // Tepig
+            new EncounterStatic { Gift = true, Species = 501, Level = 5, Location = 204, }, // Oshawott
+            
+            // Fossil
+            new EncounterStatic { Gift = true, Species = 138, Level = 20, Location = 190, }, // Omanyte
+            new EncounterStatic { Gift = true, Species = 140, Level = 20, Location = 190, }, // Kabuto
+            new EncounterStatic { Gift = true, Species = 142, Level = 20, Location = 190, }, // Aerodactyl
+            new EncounterStatic { Gift = true, Species = 345, Level = 20, Location = 190, }, // Lileep
+            new EncounterStatic { Gift = true, Species = 347, Level = 20, Location = 190, }, // Anorith
+            new EncounterStatic { Gift = true, Species = 408, Level = 20, Location = 190, }, // Cranidos
+            new EncounterStatic { Gift = true, Species = 410, Level = 20, Location = 190, }, // Shieldon
+            new EncounterStatic { Gift = true, Species = 564, Level = 20, Location = 190, }, // Tirtouga
+            new EncounterStatic { Gift = true, Species = 566, Level = 20, Location = 190, }, // Archen
+            new EncounterStatic { Gift = true, Species = 696, Level = 20, Location = 190, }, // Tyrunt
+            new EncounterStatic { Gift = true, Species = 698, Level = 20, Location = 190, }, // Amaura
 
-            new EncounterStatic { Species = 25, Level = 20, Location = 178, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false }, // Pikachu
-            new EncounterStatic { Species = 25, Level = 20, Location = 180, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false }, // Pikachu
-            new EncounterStatic { Species = 25, Level = 20, Location = 186, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false }, // Pikachu
-            new EncounterStatic { Species = 25, Level = 20, Location = 194, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false }, // Pikachu
+            new EncounterStatic { Species = 25, Level = 20, Location = 178, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false, SkipFormCheck = true }, // Pikachu
+            new EncounterStatic { Species = 25, Level = 20, Location = 180, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false, SkipFormCheck = true }, // Pikachu
+            new EncounterStatic { Species = 25, Level = 20, Location = 186, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false, SkipFormCheck = true }, // Pikachu
+            new EncounterStatic { Species = 25, Level = 20, Location = 194, Gender = 1, Ability = 4, IVs = new[] {-1, -1, -1, 31, -1, -1}, Contest = new[] {70,70,70,70,70,0}, Gift = true, Shiny = false, SkipFormCheck = true }, // Pikachu
 
             new EncounterStatic { Species = 360, Level = 1, EggLocation = 60004, Ability = 1, Gift = true }, // Wynaut
             new EncounterStatic { Species = 175, Level = 1, EggLocation = 60004, Ability = 1, Gift = true }, // Togepi
@@ -445,7 +466,7 @@ namespace PKHeX
             new EncounterStatic { Species = 382, Level = 45, Location = 296, Version = GameVersion.AS, Shiny = false, IV3 = true }, // Kyogre
             new EncounterStatic { Species = 383, Level = 45, Location = 296, Version = GameVersion.OR, Shiny = false, IV3 = true }, // Groudon
             new EncounterStatic { Species = 384, Level = 70, Location = 316, Shiny = false, IV3 = true }, // Rayquaza
-            new EncounterStatic { Species = 386, Level = 80, Location = 316, Shiny = false, IV3 = true }, // Deoxys
+            new EncounterStatic { Species = 386, Level = 80, Location = 316, Shiny = false, IV3 = true, Fateful = true }, // Deoxys
 
             new EncounterStatic { Species = 377, Level = 40, Location = 278, IV3 = true }, // Regirock
             new EncounterStatic { Species = 378, Level = 40, Location = 306, IV3 = true }, // Regice
@@ -533,18 +554,18 @@ namespace PKHeX
 
         private static readonly EncounterLink[] LinkGifts6 =
         {
-            new EncounterLink { Species = 154, Level = 50, Ability = 4 }, // Meganium
-            new EncounterLink { Species = 157, Level = 50, Ability = 4 }, // Typhlosion
-            new EncounterLink { Species = 160, Level = 50, Ability = 4 }, // Feraligatr
+            new EncounterLink { Species = 154, Level = 50, Ability = 4, XY = true, ORAS = true }, // Meganium
+            new EncounterLink { Species = 157, Level = 50, Ability = 4, XY = true, ORAS = true }, // Typhlosion
+            new EncounterLink { Species = 160, Level = 50, Ability = 4, XY = true, ORAS = true }, // Feraligatr
 
-            new EncounterLink {Species = 251, Level = 10, RelearnMoves = new[] {610, 0, 0, 0}, Ball = 11, ORAS = false }, // Celebi
+            new EncounterLink { Species = 251, Level = 10, Ability = 1, RelearnMoves = new[] {610, 0, 0, 0}, Ball = 11, XY = true }, // Celebi
 
-            new EncounterLink { Species = 377, Level = 50, RelearnMoves = new[] {153, 8, 444, 359 }, Ability = 4 }, // Regirock
-            new EncounterLink { Species = 378, Level = 50, RelearnMoves = new[] {85, 133, 58, 258 }, Ability = 4 }, // Regice
-            new EncounterLink { Species = 379, Level = 50, RelearnMoves = new[] {442, 157, 356, 334 }, Ability = 4 }, // Registeel
+            new EncounterLink { Species = 377, Level = 50, Ability = 4, RelearnMoves = new[] {153, 8, 444, 359}, XY = true, ORAS = true }, // Regirock
+            new EncounterLink { Species = 378, Level = 50, Ability = 4, RelearnMoves = new[] {85, 133, 58, 258}, XY = true, ORAS = true }, // Regice
+            new EncounterLink { Species = 379, Level = 50, Ability = 4, RelearnMoves = new[] {442, 157, 356, 334}, XY = true, ORAS = true }, // Registeel
 
-            new EncounterLink { Species = 208, Level = 40, Classic = false, Ability = 1, XY = false, OT = false }, // Steelix
-            new EncounterLink { Species = 362, Level = 40, Classic = false, Ability = 1, XY = false, OT = false }, // Glalie
+            new EncounterLink { Species = 208, Level = 40, Ability = 1, Classic = false, ORAS = true, OT = false }, // Steelix
+            new EncounterLink { Species = 362, Level = 40, Ability = 1, Classic = false, ORAS = true, OT = false }, // Glalie
         };
 
         #endregion
@@ -555,30 +576,6 @@ namespace PKHeX
             
             313, // Via Illumise
         };
-        internal static readonly int[] Inherit_Apricorn =
-        {
-            010, 013, 016, 019, 021, 023, 025, 027, 029, 035, 037, 039, 041,
-            043, 046, 048, 050, 052, 054, 056, 058, 060, 063, 066, 069, 072, 074, 077, 079, 083, 084, 086, 088, 090, 092,
-            095, 096, 098, 102, 104, 108, 109, 111, 113, 114, 115, 116, 118, 122, 124, 125, 126, 129, 131, 143, 147, 161,
-            163, 165, 167, 170, 177, 179, 183, 185, 187, 190, 191, 193, 194, 198, 200, 202, 203, 204, 206, 207, 209, 211,
-            213, 214, 215, 216, 218, 220, 222, 223, 225, 226, 227, 228, 231, 234, 235, 241, 246, 261, 263, 265, 273, 276,
-            278, 280, 285, 287, 293, 296, 302, 303, 307, 311, 312, 316, 322, 325, 327, 333, 340, 359, 366, 369, 370, 396,
-            399, 401, 403, 406, 412, 415, 418, 420, 427, 433, 441, 455,
-
-            032, // Via Nidoran-F
-
-            440, // Via Chansey
-            238, // Via Jynx
-            239, // Via Electabuzz
-            240, // Via Magmar
-            298, // Via Marill
-            360, // Via Wobbuffet
-            438, // Via Sudowoodo
-            439, // Via Mr. Mime
-            446, // Via Snorlax
-            458, // Via Mantine
-        };
-
         internal static readonly int[] Inherit_Safari =
         {
             016, 019, 020, 021, 022, 023, 024, 025, 027, 029, 035, 039, 041,
@@ -603,7 +600,7 @@ namespace PKHeX
         };
         internal static readonly int[] Inherit_Dream =
         {
-            012, 015, 016, 019, 021, 023, 027, 029, 037, 041, 043, 046, 048, 050, 052, 054, 056, 058, 060, 063, 066, 069,
+            010, 013, 016, 019, 021, 023, 027, 029, 037, 041, 043, 046, 048, 050, 052, 054, 056, 058, 060, 063, 066, 069,
             072, 074, 077, 079, 083, 084, 086, 088, 090, 092, 095, 096, 098, 102, 104, 108, 109, 111, 113, 114, 115, 116,
             118, 122, 123, 127, 129, 131, 133, 138, 140, 142, 143, 147, 161, 163, 165, 167, 170, 173, 174, 175, 177, 179,
             183, 185, 187, 190, 191, 193, 194, 198, 200, 202, 203, 204, 206, 207, 209, 211, 213, 214, 215, 216, 218, 220,
@@ -616,6 +613,30 @@ namespace PKHeX
 
             032, // Via Nidoran-F
             313, // Via Illumise
+
+            // Via Evolution
+            524, // Roggenrola
+            532, // Timburr
+            543, // Venipede
+            551, // Sandile
+            557, // Dwebble
+            577, // Solosis
+            582, // Vanillite
+            595, // Joltik
+
+            // Via Incense Breeding
+            298, 360, 406, 433, 438, 439, 440, 446, 458,
+        };
+        internal static readonly int[] Ban_DreamHidden =
+        {
+            311, // Plusle
+            312, // Minun
+            352, // Kecleon
+            355, // Duskull
+
+            // Via Pre-Evolution
+            356, // Dusclops
+            477, // Dusknoir
         };
         internal static readonly int[] Ban_Gen3Ball =
         {
@@ -630,7 +651,7 @@ namespace PKHeX
             497, 500, 503, //3
             566, 567, 696, 697, 698, 699 // Fossil Only obtain
         };
-        internal static readonly int[] Ban_Gen4Ball =
+        internal static readonly int[] Ban_Gen4Ball_6 =
         {
             152, 155, 158, //1 - Chikorita, Cyndaquil, Totodile
             153, 156, 159, //2
@@ -646,7 +667,8 @@ namespace PKHeX
             497, 500, 503, //3
             566, 567, 696, 697, 698, 699 // Fossil Only obtain
         };
-        internal static readonly int[] WurmpleEvolutions =
+
+        public static readonly int[] WurmpleEvolutions =
         {
             266, 267, // Silcoon Beautifly
             268, 269, // Cascoon Dustox
@@ -740,5 +762,10 @@ namespace PKHeX
             05, 10, 05, 05, 15, 10, 05, 05, 05, 10, 10, 10, 10, 20, 25, 10, 20, 30, 25, 20, 20, 15, 20, 15, 20, 20, 10, 10, 10, 10, 10, 20, 10, 30, 15, 10, 10, 10, 20, 20, 05, 05, 05, 20, 10, 10, 20, 15, 20, 20, 
             10, 20, 30, 10, 10, 40, 40, 30, 20, 40, 20, 20, 10, 10, 10, 10, 05, 10, 10, 05, 05,
         };
+        internal static readonly int[] UnreleasedItems_6 =
+        {
+            // todo
+        };
+        internal static readonly bool[] ReleasedHeldItems_6 = Enumerable.Range(0, MaxItemID_6_AO+1).Select(i => HeldItem_AO.Contains((ushort)i) && !UnreleasedItems_6.Contains(i)).ToArray();
     }
 }

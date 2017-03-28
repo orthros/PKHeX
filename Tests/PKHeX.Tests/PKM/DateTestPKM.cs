@@ -1,11 +1,12 @@
 ﻿using System;
+using PKHeX.Core;
 
 namespace PKHeX.Tests.PKM
 {
     /// <summary>
-    /// A <see cref="PKHeX.PKM"/> implementation designed to test <see cref="PKHeX.PKM.MetDate"/> and <see cref="PKHeX.PKM.EggDate"/>.
+    /// A <see cref="PKM"/> implementation designed to test <see cref="PKM.MetDate"/> and <see cref="PKM.EggDate"/>.
     /// </summary>
-    class DateTestPKM : PKHeX.PKM
+    class DateTestPKM : Core.PKM
     {
         public int MetYear { get; set; }
         public int MetMonth { get; set; }
@@ -15,7 +16,7 @@ namespace PKHeX.Tests.PKM
         public int EggMetDay { get; set; }
         public override PersonalInfo PersonalInfo => null;
 
-        protected override int Met_Year
+        public override int Met_Year
         {
             get
             {
@@ -28,7 +29,7 @@ namespace PKHeX.Tests.PKM
             }
         }
 
-        protected override int Met_Month
+        public override int Met_Month
         {
             get
             {
@@ -41,7 +42,7 @@ namespace PKHeX.Tests.PKM
             }
         }
 
-        protected override int Met_Day
+        public override int Met_Day
         {
             get
             {
@@ -54,7 +55,7 @@ namespace PKHeX.Tests.PKM
             }
         }
 
-        protected override int Egg_Year
+        public override int Egg_Year
         {
             get
             {
@@ -67,7 +68,7 @@ namespace PKHeX.Tests.PKM
             }
         }
 
-        protected override int Egg_Month
+        public override int Egg_Month
         {
             get
             {
@@ -80,7 +81,7 @@ namespace PKHeX.Tests.PKM
             }
         }
 
-        protected override int Egg_Day
+        public override int Egg_Day
         {
             get
             {
@@ -1041,7 +1042,7 @@ namespace PKHeX.Tests.PKM
             }
         }
 
-        public override PKHeX.PKM Clone()
+        public override Core.PKM Clone()
         {
             throw new NotImplementedException();
         }

@@ -2,11 +2,11 @@
 using System.Linq;
 using System.Text;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public class PK7 : PKM
     {
-        internal static readonly byte[] ExtraBytes =
+        public static readonly byte[] ExtraBytes =
         {
             0x2A, // Old Marking Value
             // 0x36, 0x37, // Unused Ribbons
@@ -93,7 +93,7 @@ namespace PKHeX
         public override int CNT_Smart { get { return Data[0x27]; } set { Data[0x27] = (byte)value; } }
         public override int CNT_Tough { get { return Data[0x28]; } set { Data[0x28] = (byte)value; } }
         public override int CNT_Sheen { get { return Data[0x29]; } set { Data[0x29] = (byte)value; } }
-        // public override byte MarkValue { get { return Data[0x2A]; } protected set { Data[0x2A] = value; } }
+        public byte PelagoEventStatus { get { return Data[0x2A]; } set { Data[0x2A] = value; } }
         private byte PKRS { get { return Data[0x2B]; } set { Data[0x2B] = value; } }
         public override int PKRS_Days { get { return PKRS & 0xF; } set { PKRS = (byte)(PKRS & ~0xF | value); } }
         public override int PKRS_Strain { get { return PKRS >> 4; } set { PKRS = (byte)(PKRS & 0xF | value << 4); } }
@@ -217,21 +217,12 @@ namespace PKHeX
         #region Block B
         public override string Nickname
         {
-            get
-            {
-                return Util.TrimFromZero(Encoding.Unicode.GetString(Data, 0x40, 24))
-                    .Replace("\uE08F", "\u2640") // nidoran
-                    .Replace("\uE08E", "\u2642") // nidoran
-                    .Replace("\u2019", "\u0027"); // farfetch'd
-            }
+            get { return PKX.SanitizeString(Util.TrimFromZero(Encoding.Unicode.GetString(Data, 0x40, 24))); }
             set
             {
                 if (value.Length > 12)
                     value = value.Substring(0, 12); // Hard cap
-                string TempNick = value // Replace Special Characters and add Terminator
-                    .Replace("\u2640", "\uE08F") // nidoran
-                    .Replace("\u2642", "\uE08E") // nidoran
-                    .Replace("\u0027", "\u2019") // farfetch'd
+                string TempNick = PKX.UnSanitizeString(value)
                     .PadRight(value.Length + 1, '\0'); // Null Terminator
                 Encoding.Unicode.GetBytes(TempNick).CopyTo(Data, 0x40);
             }
@@ -300,26 +291,17 @@ namespace PKHeX
         #region Block C
         public override string HT_Name
         {
-            get
-            {
-                return Util.TrimFromZero(Encoding.Unicode.GetString(Data, 0x78, 24))
-                    .Replace("\uE08F", "\u2640") // nidoran
-                    .Replace("\uE08E", "\u2642") // nidoran
-                    .Replace("\u2019", "\u0027"); // farfetch'd
-            }
+            get { return PKX.SanitizeString(Util.TrimFromZero(Encoding.Unicode.GetString(Data, 0x78, 24))); }
             set
             {
                 if (value.Length > 12)
                     value = value.Substring(0, 12); // Hard cap
-                string TempNick = value // Replace Special Characters and add Terminator
-                    .Replace("\u2640", "\uE08F") // nidoran
-                    .Replace("\u2642", "\uE08E") // nidoran
-                    .Replace("\u0027", "\u2019") // farfetch'd
+                string TempNick = PKX.UnSanitizeString(value)
                     .PadRight(value.Length + 1, '\0'); // Null Terminator
                 Encoding.Unicode.GetBytes(TempNick).CopyTo(Data, 0x78);
             }
         }
-        public int HT_Gender { get { return Data[0x92]; } set { Data[0x92] = (byte)value; } }
+        public override int HT_Gender { get { return Data[0x92]; } set { Data[0x92] = (byte)value; } }
         public override int CurrentHandler { get { return Data[0x93]; } set { Data[0x93] = (byte)value; } }
         public override int Geo1_Region { get { return Data[0x94]; } set { Data[0x94] = (byte)value; } }
         public override int Geo1_Country { get { return Data[0x95]; } set { Data[0x95] = (byte)value; } }
@@ -352,21 +334,12 @@ namespace PKHeX
         #region Block D
         public override string OT_Name
         {
-            get
-            {
-                return Util.TrimFromZero(Encoding.Unicode.GetString(Data, 0xB0, 24))
-                    .Replace("\uE08F", "\u2640") // Nidoran ♂
-                    .Replace("\uE08E", "\u2642") // Nidoran ♀
-                    .Replace("\u2019", "\u0027"); // farfetch'd
-            }
+            get { return PKX.SanitizeString(Util.TrimFromZero(Encoding.Unicode.GetString(Data, 0xB0, 24))); }
             set
             {
                 if (value.Length > 12)
                     value = value.Substring(0, 12); // Hard cap
-                string TempNick = value // Replace Special Characters and add Terminator
-                .Replace("\u2640", "\uE08F") // Nidoran ♂
-                .Replace("\u2642", "\uE08E") // Nidoran ♀
-                .Replace("\u0027", "\u2019") // Farfetch'd
+                string TempNick = PKX.UnSanitizeString(value)
                 .PadRight(value.Length + 1, '\0'); // Null Terminator
                 Encoding.Unicode.GetBytes(TempNick).CopyTo(Data, 0xB0);
             }
@@ -377,12 +350,12 @@ namespace PKHeX
         public override int OT_Memory { get { return Data[0xCD]; } set { Data[0xCD] = (byte)value; } }
         public override int OT_TextVar { get { return BitConverter.ToUInt16(Data, 0xCE); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0xCE); } }
         public override int OT_Feeling { get { return Data[0xD0]; } set { Data[0xD0] = (byte)value; } }
-        protected override int Egg_Year { get { return Data[0xD1]; } set { Data[0xD1] = (byte)value; } }
-        protected override int Egg_Month { get { return Data[0xD2]; } set { Data[0xD2] = (byte)value; } }
-        protected override int Egg_Day { get { return Data[0xD3]; } set { Data[0xD3] = (byte)value; } }
-        protected override int Met_Year { get { return Data[0xD4]; } set { Data[0xD4] = (byte)value; } }
-        protected override int Met_Month { get { return Data[0xD5]; } set { Data[0xD5] = (byte)value; } }
-        protected override int Met_Day { get { return Data[0xD6]; } set { Data[0xD6] = (byte)value; } }
+        public override int Egg_Year { get { return Data[0xD1]; } set { Data[0xD1] = (byte)value; } }
+        public override int Egg_Month { get { return Data[0xD2]; } set { Data[0xD2] = (byte)value; } }
+        public override int Egg_Day { get { return Data[0xD3]; } set { Data[0xD3] = (byte)value; } }
+        public override int Met_Year { get { return Data[0xD4]; } set { Data[0xD4] = (byte)value; } }
+        public override int Met_Month { get { return Data[0xD5]; } set { Data[0xD5] = (byte)value; } }
+        public override int Met_Day { get { return Data[0xD6]; } set { Data[0xD6] = (byte)value; } }
         public byte _0xD7 { get { return Data[0xD7]; } set { Data[0xD7] = value; } }
         public override int Egg_Location { get { return BitConverter.ToUInt16(Data, 0xD8); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0xD8); } }
         public override int Met_Location { get { return BitConverter.ToUInt16(Data, 0xDA); } set { BitConverter.GetBytes((ushort)value).CopyTo(Data, 0xDA); } }
@@ -472,18 +445,6 @@ namespace PKHeX
             Checksum = CalculateChecksum();
             return PKX.encryptArray(Data);
         }
-        public override bool getGenderIsValid()
-        {
-            int gv = PersonalInfo.Gender;
-
-            if (gv == 255)
-                return Gender == 2;
-            if (gv == 254)
-                return Gender == 1;
-            if (gv == 0)
-                return Gender == 0;
-            return true;
-        }
 
         // General User-error Fixes
         public void FixRelearn()
@@ -512,6 +473,8 @@ namespace PKHeX
         }
         public void FixMemories()
         {
+            Enjoyment = Fullness = 0;
+
             if (IsEgg) // No memories if is egg.
             {
                 Geo1_Country = Geo2_Country = Geo3_Country = Geo4_Country = Geo5_Country =
@@ -564,16 +527,13 @@ namespace PKHeX
                     Geo2_Country = Geo2_Region = 0;
                     continue;
                 }
-                if (Geo1_Country == 0 && !IsUntraded && !IsUntradedEvent6)
-                {
-                    if ((Country | Region) == 0)
-                        break;
-                    // Traded Non-Eggs/Events need to have a current location.
-                    Geo1_Country = Country;
-                    Geo1_Region = Region;
-                    continue;
-                }
                 break;
+            }
+
+            if (GenNumber < 7) // must be transferred via bank, and must have memories
+            {
+                TradeMemory(Bank: true);
+                // georegions cleared on 6->7, no need to set
             }
         }
 
@@ -605,6 +565,11 @@ namespace PKHeX
                 TradeGeoLocation(SAV_COUNTRY, SAV_REGION);
 
             CurrentHandler = 1;
+            if (HT_Name != SAV_Trainer)
+            {
+                HT_Friendship = PersonalInfo.BaseFriendship;
+                HT_Affection = 0;
+            }
             HT_Name = SAV_Trainer;
             HT_Gender = SAV_GENDER;
 
@@ -616,57 +581,50 @@ namespace PKHeX
         private void UpdateEgg(int Day, int Month, int Year)
         {
             Met_Location = 30002;
-            Egg_Day = Day;
-            Egg_Month = Month;
-            Egg_Year = Year - 2000;
+            Met_Day = Day;
+            Met_Month = Month;
+            Met_Year = Year - 2000;
         }
         private void TradeGeoLocation(int GeoCountry, int GeoRegion)
         {
-            // Allow the method to abort if the values are invalid
-            if (GeoCountry < 0 || GeoRegion < 0)
-                return;
-
-            // Trickle down
-            Geo5_Country = Geo4_Country;
-            Geo5_Region = Geo4_Region;
-
-            Geo4_Country = Geo3_Country;
-            Geo4_Region = Geo3_Region;
-
-            Geo3_Country = Geo2_Country;
-            Geo3_Region = Geo2_Region;
-
-            Geo2_Country = Geo1_Country;
-            Geo2_Region = Geo1_Region;
-
-            Geo1_Country = GeoCountry;
-            Geo1_Region = GeoRegion;
+            return; // No geolocations are set, ever! -- except for bank. Don't set them anyway.
+            //// Allow the method to abort if the values are invalid
+            //if (GeoCountry < 0 || GeoRegion < 0)
+            //    return;
+            //
+            //// Trickle down
+            //Geo5_Country = Geo4_Country;
+            //Geo5_Region = Geo4_Region;
+            //
+            //Geo4_Country = Geo3_Country;
+            //Geo4_Region = Geo3_Region;
+            //
+            //Geo3_Country = Geo2_Country;
+            //Geo3_Region = Geo2_Region;
+            //
+            //Geo2_Country = Geo1_Country;
+            //Geo2_Region = Geo1_Region;
+            //
+            //Geo1_Country = GeoCountry;
+            //Geo1_Region = GeoRegion;
         }
         public void TradeMemory(bool Bank)
         {
-            return; // appears no memories are set, ever?
-            // HT_Memory = 4; // Link trade to [VAR: General Location]
-            // HT_TextVar = Bank ? 0 : 9; // Somewhere (Bank) : Pokécenter (Trade)
-            // HT_Intensity = 1;
-            // HT_Feeling = Util.rand.Next(0, Bank ? 9 : 19); // 0-9 Bank, 0-19 Trade
-        }
-        public void TradeFriendshipAffection(string SAV_TRAINER)
-        {
-            // Don't alter the data if the info is the same.
-            if (SAV_TRAINER == HT_Name) 
+            if (!Bank)
                 return;
 
-            // Reset
-            HT_Friendship = PersonalInfo.BaseFriendship;
-            HT_Affection = 0;
+            HT_Memory = 4; // Link trade to [VAR: General Location]
+            HT_TextVar = 0; // Somewhere (Bank)
+            HT_Intensity = 1;
+            HT_Feeling = Util.rand.Next(0, 9); // 0-9 Bank
         }
 
         // Legality Properties
         public override bool WasLink => Met_Location == 30011;
-        public override bool WasEgg => Legal.EggLocations.Contains(Egg_Location);
+        public override bool WasEgg => GenNumber < 4 ? base.WasEgg : GenNumber == 4 ? Egg_Location > 0 : Legal.EggLocations.Contains(Egg_Location);
         public override bool WasEvent => Met_Location > 40000 && Met_Location < 50000 || FatefulEncounter && Species != 386;
         public override bool WasEventEgg => ((Egg_Location > 40000 && Egg_Location < 50000) || (FatefulEncounter && Egg_Location == 30002)) && Met_Level == 1;
-        public override bool WasTradedEgg => Egg_Location == 30002;
-        public override bool WasIngameTrade => Met_Location == 30001;
+        public override bool WasTradedEgg => Egg_Location == 30002 || GenNumber == 4 && Egg_Location == 2002;
+        public override bool WasIngameTrade => Met_Location == 30001 || GenNumber == 4 && Egg_Location == 2001;
     }
 }

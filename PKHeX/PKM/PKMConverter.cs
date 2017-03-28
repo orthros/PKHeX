@@ -1,23 +1,25 @@
 ﻿using System;
 using System.Linq;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public static class PKMConverter
     {
-        internal static int Country = 49;
-        internal static int Region = 7;
-        internal static int ConsoleRegion = 1;
-        internal static string OT_Name = "PKHeX";
-        internal static int OT_Gender;
-        
-        internal static void updateConfig(int SUBREGION, int COUNTRY, int _3DSREGION, string TRAINERNAME, int TRAINERGENDER)
+        public static int Country = 49;
+        public static int Region = 7;
+        public static int ConsoleRegion = 1;
+        public static string OT_Name = "PKHeX";
+        public static int OT_Gender; // Male
+        public static int Language = 1; // en
+
+        public static void updateConfig(int SUBREGION, int COUNTRY, int _3DSREGION, string TRAINERNAME, int TRAINERGENDER, int LANGUAGE)
         {
             Region = SUBREGION;
             Country = COUNTRY;
             ConsoleRegion = _3DSREGION;
             OT_Name = TRAINERNAME;
             OT_Gender = TRAINERGENDER;
+            Language = LANGUAGE;
         }
 
         /// <summary>
@@ -73,8 +75,9 @@ namespace PKHeX
         /// </summary>
         /// <param name="data">Raw data of the Pokemon file.</param>
         /// <param name="ident">Optional identifier for the Pokemon.  Usually the full path of the source file.</param>
+        /// <param name="prefer">Optional identifier for the preferred generation.  Usually the generation of the destination save file.</param>
         /// <returns>An instance of <see cref="PKM"/> created from the given <paramref name="data"/>, or null if <paramref name="data"/> is invalid.</returns>
-        public static PKM getPKMfromBytes(byte[] data, string ident = null)
+        public static PKM getPKMfromBytes(byte[] data, string ident = null, int prefer = 7)
         {
             checkEncrypted(ref data);
             switch (getPKMDataFormat(data))
@@ -107,15 +110,68 @@ namespace PKHeX
                 case 5:
                     return new PK5(data, ident);
                 case 6:
-                    PKM pkx = new PK6(data, ident);
-                    if (pkx.SM)
-                        pkx = new PK7(data, ident);
-                    return pkx;
+                    var pkx = new PK6(data, ident);
+                    return checkPKMFormat7(pkx, prefer);
                 default:
                     return null;
             }
         }
-        internal static PKM convertToFormat(PKM pk, Type PKMType, out string comment)
+        
+        /// <summary>
+        /// Checks if the input PK6 file is really a PK7, if so, updates the object.
+        /// </summary>
+        /// <param name="pk">PKM to check</param>
+        /// <param name="prefer">Prefer a certain generation over another</param>
+        /// <returns>Updated PKM if actually PK7</returns>
+        private static PKM checkPKMFormat7(PK6 pk, int prefer) => checkPK6is7(pk, prefer) ? new PK7(pk.Data, pk.Identifier) : (PKM)pk;
+        /// <summary>
+        /// Checks if the input PK6 file is really a PK7.
+        /// </summary>
+        /// <param name="pk">PK6 to check</param>
+        /// <param name="prefer">Prefer a certain generation over another</param>
+        /// <returns>Boolean is a PK7</returns>
+        private static bool checkPK6is7(PK6 pk, int prefer)
+        {
+            if (pk.Version > Legal.MaxGameID_6)
+                return true;
+            if (pk.Enjoyment != 0 || pk.Fullness != 0)
+                return false;
+
+            // Check Ranges
+            if (pk.Species > Legal.MaxSpeciesID_6)
+                return true;
+            if (pk.Moves.Any(move => move > Legal.MaxMoveID_6_AO))
+                return true;
+            if (pk.RelearnMoves.Any(move => move > Legal.MaxMoveID_6_AO))
+                return true;
+            if (pk.Ability > Legal.MaxAbilityID_6_AO)
+                return true;
+            if (pk.HeldItem > Legal.MaxItemID_6_AO)
+                return true;
+
+            int et = pk.EncounterType;
+            if (et != 0)
+            {
+                if (pk.CurrentLevel < 100) // can't be hyper trained
+                    return false;
+
+                if (pk.GenNumber != 4) // can't have encounter type
+                    return true;
+                if (et > 24) // invalid encountertype
+                    return true;
+            }
+
+            int mb = BitConverter.ToUInt16(pk.Data, 0x16);
+            if (mb > 0xAAA)
+                return false;
+            for (int i = 0; i < 6; i++)
+                if ((mb >> (i << 1) & 3) == 3) // markings are 10 or 01 (or 00), never 11
+                    return false;
+
+            return prefer > 6;
+        }
+
+        public static PKM convertToFormat(PKM pk, Type PKMType, out string comment)
         {
             if (pk == null || pk.Species == 0)
             {
@@ -152,16 +208,16 @@ namespace PKHeX
                 }
                 switch (fromType.Name)
                 {
-                    case "PK1":
+                    case nameof(PK1):
                         if (toFormat == 2)
                         {
                             pkm = PKMType == typeof (PK2) ? ((PK1) pk).convertToPK2() : null;
                             break;
                         }
                         if (toFormat == 7)
-                            pkm = null; // pkm.convertPK1toPK7();
+                            pkm = ((PK1) pk).convertToPK7();
                         break;
-                    case "PK2":
+                    case nameof(PK2):
                         if (PKMType == typeof (PK1))
                         {
                             if (pk.Species > 151)
@@ -174,43 +230,37 @@ namespace PKHeX
                         else
                             pkm = null;
                         break;
-                    case "CK3":
-                    case "XK3":
+                    case nameof(CK3):
+                    case nameof(XK3):
                         // interconverting C/XD needs to visit main series format
                         // ends up stripping purification/shadow etc stats
                         pkm = pkm.convertToPK3();
-                        goto case "PK3"; // fall through
-                    case "PK3":
+                        goto case nameof(PK3); // fall through
+                    case nameof(PK3):
                         if (toFormat == 3) // Gen3 Inter-trading
                         {
                             switch (PKMType.Name)
                             {
-                                case "CK3": pkm = pkm.convertToCK3(); break;
-                                case "XK3": pkm = pkm.convertToXK3(); break;
-                                case "PK3": pkm = pkm.convertToPK3(); break; // already converted, instantly returns
+                                case nameof(CK3): pkm = pkm.convertToCK3(); break;
+                                case nameof(XK3): pkm = pkm.convertToXK3(); break;
+                                case nameof(PK3): pkm = pkm.convertToPK3(); break; // already converted, instantly returns
                                 default: throw new FormatException();
                             }
                             break;
                         }
-                        if (fromType.Name != "PK3")
+                        if (fromType.Name != nameof(PK3))
                             pkm = pkm.convertToPK3();
 
                         pkm = ((PK3)pkm).convertToPK4();
                         if (toFormat == 4)
-                        {
-                            if (PKMType == typeof (BK4))
-                                pkm = ((PK4) pkm).convertToBK4();
                             break;
-                        }
-                        pkm = ((PK4)pkm).convertToPK5();
-                        if (toFormat == 5)
+                        goto case nameof(PK4);
+                    case nameof(BK4):
+                        pkm = ((BK4)pkm).convertToPK4();
+                        if (toFormat == 4)
                             break;
-                        pkm = ((PK5)pkm).convertToPK6();
-                        if (toFormat == 6)
-                            break;
-                        pkm = new PK7(pkm.Data, pkm.Identifier);
-                        break;
-                    case "PK4":
+                        goto case nameof(PK4);
+                    case nameof(PK4):
                         if (PKMType == typeof(BK4))
                         {
                             pkm = ((PK4)pkm).convertToBK4();
@@ -219,28 +269,18 @@ namespace PKHeX
                         pkm = ((PK4)pkm).convertToPK5();
                         if (toFormat == 5)
                             break;
+                        goto case nameof(PK5);
+                    case nameof(PK5):
                         pkm = ((PK5)pkm).convertToPK6();
                         if (toFormat == 6)
                             break;
-                        pkm = new PK7(pkm.Data, pkm.Identifier);
-                        break;
-                    case "BK4":
-                        pkm = ((BK4)pkm).convertToPK4();
-                        if (toFormat == 4)
+                        goto case nameof(PK6);
+                    case nameof(PK6):
+                        pkm = ((PK6)pkm).convertToPK7();
+                        if (toFormat == 7)
                             break;
-                        pkm = ((PK4)pkm).convertToPK5();
-                        if (toFormat == 5)
-                            break;
-                        pkm = ((PK5)pkm).convertToPK6();
-                        if (toFormat == 6)
-                            break;
-                        pkm = new PK7(pkm.Data, pkm.Identifier);
-                        break;
-                    case "PK5":
-                        pkm = ((PK5)pkm).convertToPK6();
-                        break;
-                    case "PK6":
-                        pkm = new PK7(pkm.Data, pkm.Identifier);
+                        goto case nameof(PK7);
+                    case nameof(PK7):
                         break;
                 }
             }
@@ -251,25 +291,32 @@ namespace PKHeX
 
             return pkm;
         }
-        internal static void checkEncrypted(ref byte[] pkm)
+        public static void checkEncrypted(ref byte[] pkm)
         {
             int format = getPKMDataFormat(pkm);
-            ushort chk = 0;
             switch (format)
             {
                 case 1:
-                case 3: // TOneverDO, nobody exports encrypted pk3s
+                case 2: // no encryption
+                    return;
+                case 3:
+                    if (pkm.Length == PKX.SIZE_3CSTORED || pkm.Length == PKX.SIZE_3XSTORED)
+                        return; // no encryption for C/XD
+                    ushort chk = 0;
+                    for (int i = 0x20; i < PKX.SIZE_3STORED; i += 2)
+                        chk += BitConverter.ToUInt16(pkm, i);
+                    if (chk != BitConverter.ToUInt16(pkm, 0x1C))
+                        pkm = PKX.decryptArray3(pkm);
                     return;
                 case 4:
                 case 5:
                     if (BitConverter.ToUInt16(pkm, 4) != 0) // BK4
                         return;
-                    for (int i = 8; i < PKX.SIZE_4STORED; i += 2)
-                        chk += BitConverter.ToUInt16(pkm, i);
-                    if (chk != BitConverter.ToUInt16(pkm, 0x06))
+                    if (BitConverter.ToUInt32(pkm, 0x64) != 0)
                         pkm = PKX.decryptArray45(pkm);
                     return;
                 case 6:
+                case 7:
                     if (BitConverter.ToUInt16(pkm, 0xC8) != 0 && BitConverter.ToUInt16(pkm, 0x58) != 0)
                         pkm = PKX.decryptArray(pkm);
                     return;

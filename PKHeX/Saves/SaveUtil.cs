@@ -4,41 +4,42 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace PKHeX
+namespace PKHeX.Core
 {
     public static class SaveUtil
     {
-        internal const int BEEF = 0x42454546;
+        public const int BEEF = 0x42454546;
 
-        internal const int SIZE_G7SM = 0x6BE00;
-        internal const int SIZE_G6XY = 0x65600;
-        internal const int SIZE_G6ORAS = 0x76000;
-        internal const int SIZE_G6ORASDEMO = 0x5A00;
-        internal const int SIZE_G5RAW = 0x80000;
-        internal const int SIZE_G5BW = 0x24000;
-        internal const int SIZE_G5B2W2 = 0x26000;
-        internal const int SIZE_G4BR = 0x380000;
-        internal const int SIZE_G4RAW = 0x80000;
-        internal const int SIZE_G3BOX = 0x76000;
-        internal const int SIZE_G3BOXGCI = 0x76040; // +64 if has GCI data
-        internal const int SIZE_G3COLO = 0x60000;
-        internal const int SIZE_G3COLOGCI = 0x60040; // +64 if has GCI data
-        internal const int SIZE_G3XD = 0x56000;
-        internal const int SIZE_G3XDGCI = 0x56040; // +64 if has GCI data
-        internal const int SIZE_G3RAW = 0x20000;
-        internal const int SIZE_G3RAWHALF = 0x10000;
-        internal const int SIZE_G2RAW_U = 0x8000;
-        internal const int SIZE_G2BAT_U = 0x802C;
-        internal const int SIZE_G2EMU = 0x8030;
-        internal const int SIZE_G2RAW_J = 0x10000;
-        internal const int SIZE_G2BAT_J = 0x1002C;
-        internal const int SIZE_G1RAW = 0x8000;
-        internal const int SIZE_G1BAT = 0x802C;
+        public const int SIZE_G7SM = 0x6BE00;
+        public const int SIZE_G6XY = 0x65600;
+        public const int SIZE_G6ORAS = 0x76000;
+        public const int SIZE_G6ORASDEMO = 0x5A00;
+        public const int SIZE_G5RAW = 0x80000;
+        public const int SIZE_G5BW = 0x24000;
+        public const int SIZE_G5B2W2 = 0x26000;
+        public const int SIZE_G4BR = 0x380000;
+        public const int SIZE_G4RAW = 0x80000;
+        public const int SIZE_G3BOX = 0x76000;
+        public const int SIZE_G3BOXGCI = 0x76040; // +64 if has GCI data
+        public const int SIZE_G3COLO = 0x60000;
+        public const int SIZE_G3COLOGCI = 0x60040; // +64 if has GCI data
+        public const int SIZE_G3XD = 0x56000;
+        public const int SIZE_G3XDGCI = 0x56040; // +64 if has GCI data
+        public const int SIZE_G3RAW = 0x20000;
+        public const int SIZE_G3RAWHALF = 0x10000;
+        public const int SIZE_G2RAW_U = 0x8000;
+        public const int SIZE_G2VC = 0x8010;
+        public const int SIZE_G2BAT_U = 0x802C;
+        public const int SIZE_G2EMU = 0x8030;
+        public const int SIZE_G2RAW_J = 0x10000;
+        public const int SIZE_G2BAT_J = 0x1002C;
+        public const int SIZE_G1RAW = 0x8000;
+        public const int SIZE_G1BAT = 0x802C;
 
-        internal static readonly byte[] FOOTER_DSV = Encoding.ASCII.GetBytes("|-DESMUME SAVE-|");
-        internal static readonly byte[] HEADER_BOX = Encoding.ASCII.GetBytes("GPX");
-        internal static readonly byte[] HEADER_COLO = Encoding.ASCII.GetBytes("GC6");
-        internal static readonly byte[] HEADER_XD = Encoding.ASCII.GetBytes("GXX");
+        public static readonly byte[] FOOTER_DSV = Encoding.ASCII.GetBytes("|-DESMUME SAVE-|");
+        public static readonly byte[] HEADER_BOX = Encoding.ASCII.GetBytes("GPX");
+        public static readonly byte[] HEADER_COLO = Encoding.ASCII.GetBytes("GC6");
+        public static readonly byte[] HEADER_XD = Encoding.ASCII.GetBytes("GXX");
 
         /// <summary>Determines the generation of the given save data.</summary>
         /// <param name="data">Save data of which to determine the generation</param>
@@ -117,7 +118,7 @@ namespace PKHeX
         /// <returns>Version Identifier or Invalid if type cannot be determined.</returns>
         public static GameVersion getIsG2SAV(byte[] data)
         {
-            if (data.Length != SIZE_G2RAW_U && data.Length != SIZE_G2BAT_U && data.Length != SIZE_G2RAW_J && data.Length != SIZE_G2BAT_J && data.Length != SIZE_G2EMU)
+            if (!new[] {SIZE_G2RAW_J, SIZE_G2RAW_U, SIZE_G2BAT_J, SIZE_G2BAT_U, SIZE_G2EMU, SIZE_G2VC}.Contains(data.Length))
                 return GameVersion.Invalid;
 
             // Check if it's not an american save or a japanese save
@@ -256,7 +257,7 @@ namespace PKHeX
             int offset = data.Length - SIZE_G3COLO;
             for (int i = 0; i < 3; i++)
             {
-                var ident = data.Skip(0x6000 + offset + 0x1E000*i).Take(4).ToArray();
+                var ident = data.Skip(0x6000 + offset + 0x1E000*i).Take(4);
                 if (!ident.SequenceEqual(slotintroColo))
                     return GameVersion.Invalid;
             }
@@ -275,7 +276,7 @@ namespace PKHeX
             int offset = data.Length - SIZE_G3XD;
             for (int i = 0; i < 2; i++)
             {
-                var ident = data.Skip(0x6000 + offset + 0x28000 * i).Take(4).ToArray();
+                var ident = data.Skip(0x6000 + offset + 0x28000 * i).Take(4);
                 if (!ident.SequenceEqual(slotintroXD))
                     return GameVersion.Invalid;
             }
@@ -372,6 +373,9 @@ namespace PKHeX
             }
             return GameVersion.Invalid;
         }
+        /// <summary>Determines the type of 7th gen save</summary>
+        /// <param name="data">Save data of which to determine the type</param>
+        /// <returns>Version Identifier or Invalid if type cannot be determined.</returns>
         public static GameVersion getIsG7SAV(byte[] data)
         {
             if (!new [] {SIZE_G7SM}.Contains(data.Length))
@@ -416,55 +420,160 @@ namespace PKHeX
         }
 
         /// <summary>
+        /// Creates an instance of a SaveFile with a blank base.
+        /// </summary>
+        /// <param name="Game">Version to create the save file for.</param>
+        /// <param name="OT">Trainer Name</param>
+        /// <returns></returns>
+        public static SaveFile getBlankSAV(GameVersion Game, string OT)
+        {
+            var SAV = getBlankSAV(Game);
+            if (SAV == null)
+                return null;
+
+            SAV.Game = (int)Game;
+            SAV.OT = OT;
+
+            // Secondary Properties may not be used but can be filled in as template.
+            SAV.TID = 12345;
+            SAV.SID = 54321;
+            SAV.Language = 2; // English
+            SAV.Country = 49; // USA
+            SAV.SubRegion = 7; // CA
+            SAV.ConsoleRegion = 1; // Americas
+
+            return SAV;
+        }
+        /// <summary>
+        /// Creates an instance of a SaveFile with a blank base.
+        /// </summary>
+        /// <param name="Game">Version to create the save file for.</param>
+        /// <returns></returns>
+        private static SaveFile getBlankSAV(GameVersion Game)
+        {
+            switch (Game)
+            {
+                case GameVersion.RBY:
+                    return new SAV1();
+
+                case GameVersion.GS: case GameVersion.C: case GameVersion.GSC:
+                    return new SAV2();
+
+                case GameVersion.R: case GameVersion.S: case GameVersion.E: case GameVersion.FR: case GameVersion.LG:
+                    return new SAV3(versionOverride: Game);
+
+                case GameVersion.COLO:
+                    return new SAV3Colosseum();
+                case GameVersion.XD:
+                    return new SAV3XD();
+                case GameVersion.RSBOX:
+                    return new SAV3RSBox();
+
+                case GameVersion.D: case GameVersion.P: case GameVersion.DP:
+                    return new SAV4(new byte[SIZE_G4RAW], GameVersion.DP);
+                case GameVersion.Pt:
+                    return new SAV4(new byte[SIZE_G4RAW], GameVersion.Pt);
+                case GameVersion.HG: case GameVersion.SS: case GameVersion.HGSS:
+                    return new SAV4(new byte[SIZE_G4RAW], GameVersion.HGSS);
+
+                case GameVersion.B: case GameVersion.W: case GameVersion.BW:
+                    return new SAV5(new byte[SIZE_G5RAW], GameVersion.BW);
+                case GameVersion.B2: case GameVersion.W2: case GameVersion.B2W2:
+                    return new SAV5(new byte[SIZE_G5RAW], GameVersion.B2W2);
+
+                case GameVersion.X: case GameVersion.Y: case GameVersion.XY:
+                    return new SAV6(new byte[SIZE_G6XY]);
+                case GameVersion.ORASDEMO:
+                    return new SAV6(new byte[SIZE_G6ORASDEMO]);
+                case GameVersion.OR: case GameVersion.AS: case GameVersion.ORAS:
+                    return new SAV6(new byte[SIZE_G6ORAS]);
+
+                case GameVersion.SN: case GameVersion.MN: case GameVersion.SM:
+                    return new SAV7(new byte[SIZE_G7SM]);
+
+                default:
+                    return null;
+            }
+        }
+        /// <summary>
+        /// Creates an instance of a SaveFile with a blank base.
+        /// </summary>
+        /// <param name="generation">Generation of the Save File.</param>
+        /// <param name="OT">Trainer Name</param>
+        /// <returns>Save File for that generation.</returns>
+        public static SaveFile getBlankSAV(int generation, string OT)
+        {
+            var ver = GameUtil.getVersion(generation);
+            return getBlankSAV(ver, OT);
+        }
+
+        /// <summary>
         /// Detects a save file.
         /// </summary>
         /// <returns>Full path of a save file. Returns null if unable to find any.</returns>
-        public static string detectSaveFile()
+        public static bool detectSaveFile(out string path, params string[] extra)
         {
-            string path;
             string path3DS = Path.GetPathRoot(Util.get3DSLocation());
             List<string> possiblePaths = new List<string>();
+            List<string> foldersToCheck = new List<string>(extra.Where(f => f?.Length > 0));
 
-            // save_manager
-            if (path3DS != null && Directory.Exists(path = Path.Combine(path3DS, "saveDataBackup")))
-                possiblePaths.AddRange(getSavesFromFolder(path, false));
+            // Homebrew/CFW
+            if (path3DS != null)
+            {
+                foldersToCheck.AddRange(new[]
+                {
+                    Path.Combine(path3DS, "saveDataBackup"),
+                    Path.Combine(path3DS, "filer", "UserSaveData"),
+                    Path.Combine(path3DS, "JKSV", "Saves"),
+                    Path.Combine(path3DS, "TWLSaveTool"),
+                    Path.Combine(path3DS, "fbi", "save"),
+                });
+            }
 
-            // SaveDataFiler
-            if (path3DS != null && Directory.Exists(path = Path.Combine(path3DS, "filer", "UserSaveData")))
-                possiblePaths.AddRange(getSavesFromFolder(path, true));
-
-            // JKSV
-            if (path3DS != null && Directory.Exists(path = Path.Combine(path3DS, "JKSV", "Saves")))
-                possiblePaths.AddRange(getSavesFromFolder(path, true));
-
-            // TWL Save Tool
-            if (path3DS != null && Directory.Exists(path = Path.Combine(path3DS, "TWLSaveTool")))
-                possiblePaths.AddRange(getSavesFromFolder(path, false));
-
-            // FBI
-            if (path3DS != null && Directory.Exists(path = Path.Combine(path3DS, "fbi", "save")))
-                possiblePaths.AddRange(getSavesFromFolder(path, false));
-
-            // CyberGadget (Cache)
-            string pathCache = Util.GetCacheFolder();
-            if (Directory.Exists(pathCache))
-                possiblePaths.AddRange(getSavesFromFolder(Path.Combine(pathCache), false));
+            foreach (var p in foldersToCheck)
+            {
+                IEnumerable<string> files;
+                if (!getSavesFromFolder(p, true, out files))
+                {
+                    if (files == null)
+                        continue;
+                    path = files.First(); // error
+                    return false;
+                }
+                possiblePaths.AddRange(files);
+            }
 
             // return newest save file path that is valid (oh man)
-            return possiblePaths.OrderByDescending(f => new FileInfo(f).LastWriteTime).FirstOrDefault(p => getVariantSAV(File.ReadAllBytes(p))?.ChecksumsValid ?? false);
+            path = possiblePaths.OrderByDescending(f => new FileInfo(f).LastWriteTime).FirstOrDefault(p => getVariantSAV(File.ReadAllBytes(p))?.ChecksumsValid ?? false);
+            return true;
         }
         /// <summary>
         /// Retrieves the full path of the most recent file based on LastWriteTime.
         /// </summary>
         /// <param name="folderPath">Folder to look within</param>
         /// <param name="deep">Search all subfolders</param>
-        /// <returns>Full path of all save files that match criteria.</returns>
-        public static IEnumerable<string> getSavesFromFolder(string folderPath, bool deep)
+        /// <param name="result">Full path of all save files that match criteria.</param>
+        /// <returns>Boolean indicating whether or not operation was successful.</returns>
+        public static bool getSavesFromFolder(string folderPath, bool deep, out IEnumerable<string> result)
         {
             if (!Directory.Exists(folderPath))
-                return null;
-            return Directory.GetFiles(folderPath, "*", deep ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)
-                    .Where(f => SizeValidSAV((int)new FileInfo(f).Length));
+            {
+                result = null;
+                return false;
+            }
+            try
+            {
+                var searchOption = deep ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                var files = Directory.GetFiles(folderPath, "*", searchOption);
+                result = files.Where(f => SizeValidSAV((int)new FileInfo(f).Length));
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                result = new[] {"Error encountered when detecting saves in the following folder:" + Environment.NewLine + folderPath,
+                    "Advise manually scanning to remove bad filenames from the folder." + Environment.NewLine + "Likely caused via Homebrew creating invalid filenames."};
+                return false;
+            }
         }
 
         /// <summary>
@@ -557,48 +666,34 @@ namespace PKHeX
         /// <param name="blockID">Block ID to checksum</param>
         /// <param name="initial">Initial value for checksum</param>
         /// <returns>Checksum</returns>
-        internal static ushort check16(byte[] data, int blockID, ushort initial = 0)
+        public static ushort check16(byte[] data, int blockID, ushort initial = 0)
         {
             if (blockID == 36)
                 new byte[0x80].CopyTo(data, 0x100);
 
-            int len = data.Length;
             ushort chk = (ushort)~initial;
-            if (len > 1)
+            for (int i = 0; i < data.Length; i++)
             {
-                int ofs = -1;
-                if (len % 2 == 0) // always true, always even length
-                {
-                    ofs = 0;
-                    chk = (ushort)(crc16[(data[0] ^ chk) & 0xFF] ^ chk >> 8);
-                }
-
-                for (int i = (len - 1) / 2; i != 0; i--, ofs += 2)
-                {
-                    ushort temp = crc16[(data[ofs + 1] ^ chk) & 0xFF];
-                    chk = (ushort)(crc16[(data[ofs + 2] ^ temp ^ chk >> 8) & 0xFF] ^ (temp ^ chk >> 8) >> 8);
-                }
+                chk = (ushort)(crc16[(data[i] ^ chk) & 0xFF] ^ chk >> 8);
             }
-            if (len > 0)
-                chk = (ushort)(crc16[(data[len - 1] ^ chk) & 0xFF] ^ chk >> 8);
 
             return (ushort)~chk;
         }
         public static byte[] Resign7(byte[] sav7)
         {
-            return MemeCrypto.Resign(sav7);
+            return MemeCrypto.Resign(sav7, false);
         }
         /// <summary>Calculates the 32bit checksum over an input byte array. Used in GBA save files.</summary>
         /// <param name="data">Input byte array</param>
         /// <returns>Checksum</returns>
-        internal static ushort check32(byte[] data)
+        public static ushort check32(byte[] data)
         {
             uint val = 0;
             for (int i = 0; i < data.Length; i += 4)
                 val += BitConverter.ToUInt32(data, i);
             return (ushort)((val & 0xFFFF) + (val >> 16));
         }
-        internal static void CheckHeaderFooter(ref byte[] input, ref byte[] header, ref byte[] footer)
+        public static void CheckHeaderFooter(ref byte[] input, ref byte[] header, ref byte[] footer)
         {
             if (input.Length > SIZE_G4RAW) // DeSmuME Gen4/5 DSV
             {
@@ -833,7 +928,7 @@ namespace PKHeX
             }
         }
 
-        internal static byte[] DecryptGC(byte[] input, int start, int end, ushort[] keys)
+        public static byte[] DecryptGC(byte[] input, int start, int end, ushort[] keys)
         {
             byte[] output = (byte[])input.Clone();
             for (int ofs = start; ofs < end; ofs += 8)
@@ -848,7 +943,7 @@ namespace PKHeX
             }
             return output;
         }
-        internal static byte[] EncryptGC(byte[] input, int start, int end, ushort[] keys)
+        public static byte[] EncryptGC(byte[] input, int start, int end, ushort[] keys)
         {
             byte[] output = (byte[])input.Clone();
             for (int ofs = start; ofs < end; ofs += 8)
@@ -879,6 +974,102 @@ namespace PKHeX
             keys[3] = (ushort)(oldKeys[0] >> 12 & 0xf   | oldKeys[1] >> 8 & 0xf0    | oldKeys[2] >> 4 & 0xf00   | oldKeys[3] & 0xf000);
 
             return keys;
+        }
+
+        /// <summary>
+        /// Creates a 16bit TID/SID tuple for a given G7TID.
+        /// </summary>
+        /// <param name="G7TID">Desired G7TID</param>
+        /// <param name="minimizeSID">Optional param to yield minimum SID.</param>
+        /// <returns>16bit TID/SID tuple</returns>
+        public static Tuple<uint, uint> getTIDSID(uint G7TID, bool minimizeSID = false)
+        {
+            // 32 bit number = 4294 967295
+            // lowest 6 digits G7TID
+
+            // Bare minimum 32bit value to get ID, yields min SID
+            uint val = G7TID;
+            if (!minimizeSID) // randomize SID
+            {
+                uint s7 = 4294;
+                if (val > 967295)
+                    s7 -= 1;
+                s7 = (uint)Util.rand.Next(0, (int)s7);
+                val += s7 * 1000000;
+            }
+            uint TID = val & 0xFFFF;
+            uint SID = val >> 16;
+
+            return new Tuple<uint, uint>(TID, SID);
+        }
+
+        /// <summary>
+        /// Creates a <see cref="SaveFile"/> via decryption using a stored xorpad.
+        /// </summary>
+        /// <param name="input">Encrypted byte array of savedata to decrypt.</param>
+        /// <param name="XORpads">Array of possible paths to check for xorpad compatibility.</param>
+        /// <returns>Returns a <see cref="SaveFile"/> if decryption was successful, else null.</returns>
+        public static SaveFile getSAVfromXORpads(byte[] input, string[] XORpads)
+        {
+            byte[] savID = new byte[0x10];
+            Array.Copy(input, 0x10, savID, 0, 0x10);
+            int[] sizes = { SIZE_G6XY, SIZE_G6ORAS, SIZE_G7SM };
+
+            foreach (var file in XORpads)
+            {
+                // Check if xorpad
+                FileInfo fi = new FileInfo(file);
+
+                string filename = fi.Name.ToLower();
+                if (!filename.Contains("xorpad") && !filename.Contains("key"))
+                    continue;
+
+                var length = fi.Length;
+                if (length != 0x10009C && length != 0x100000)
+                    continue;
+                
+                // Fix xorpad alignment
+                byte[] xorpad = File.ReadAllBytes(file);
+                if (xorpad.Length == 0x10009C) // Trim off Powersaves' header
+                {
+                    Array.Copy(xorpad, 0x9C, xorpad, 0, 0x100000);
+                    Array.Resize(ref xorpad, 0x100000);
+                }
+
+                // Check if encrypted 00's match save
+                if (!xorpad.Skip(0x10).Take(0x10).SequenceEqual(savID))
+                    continue;
+
+                // Set up Decrypted File
+                const int mainOffset = 0x5400;
+                int maxSize = sizes.Max();
+                byte[] decryptedPS = new byte[maxSize];
+                Array.Copy(input, mainOffset, decryptedPS, 0, decryptedPS.Length);
+
+                // xor through and decrypt
+                for (int z = 0; z < decryptedPS.Length; z++)
+                    decryptedPS[z] ^= xorpad[mainOffset + z];
+
+                // Weakly check the validity of the decrypted content
+                int i; for (i = 0; i < sizes.Length; i++)
+                {
+                    if (BitConverter.ToUInt32(decryptedPS, sizes[i] - 0x1F0) != BEEF)
+                        continue;
+                    Array.Resize(ref decryptedPS, sizes[i]);
+                    break;
+                }
+                if (i == sizes.Length)
+                    continue;
+                
+                // Save file is now decrypted!
+                var SAV = getVariantSAV(decryptedPS);
+                if (SAV == null)
+                    continue;
+
+                SAV.FileName = file;
+                return SAV;
+            }
+            return null; // no xorpad compatible
         }
     }
 }
